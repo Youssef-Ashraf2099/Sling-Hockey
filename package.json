@@ -1,7 +1,8 @@
 {
-  "name": "sling-hockey-3d",
+  "name": "slingy-io",
   "version": "1.0.0",
   "description": "High-fidelity 3D Sling Hockey game with React Three Fiber",
+  "type": "module",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
