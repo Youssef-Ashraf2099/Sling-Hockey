@@ -1,18 +1,16 @@
 {
-  "name": "slingy-io",
+  "name": "sling-hockey-pro",
   "version": "1.0.0",
-  "description": "High-fidelity 3D Sling Hockey game with React Three Fiber",
+  "description": "Professional 2D Sling Hockey platform with Chess.com-style dashboard",
   "type": "module",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "@react-three/fiber": "^8.15.0",
-    "@react-three/drei": "^9.88.0",
-    "@react-three/cannon": "^6.6.0",
-    "three": "^0.158.0",
+    "matter-js": "^0.19.0",
+    "zustand": "^4.4.7",
     "lucide-react": "^0.294.0",
-    "cannon-es": "^0.20.0"
+    "react-router-dom": "^6.20.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.0",
@@ -22,7 +20,7 @@
     "autoprefixer": "^10.4.16"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 3000 --open",
     "build": "vite build",
     "preview": "vite preview"
   }
