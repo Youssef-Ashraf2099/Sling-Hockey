@@ -2,6 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { Home, Settings, Trophy, ShoppingBag, Menu } from "lucide-react";
 import GameBoard from "../features/game/components/GameBoard";
+import DifficultySelector from "../features/game/components/DifficultySelector";
 import { useGameStore } from "../features/game/store/gameStore";
 import { useShopStore } from "../features/shop/store/shopStore";
 import { Button } from "../shared/components/Button";
@@ -11,15 +12,16 @@ export default function GamePage() {
   const { mode } = useParams();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showDifficultySelector, setShowDifficultySelector] = useState(false);
 
   const {
     gameState,
-    currentPlayer,
     player1Score,
     player2Score,
     turnTimeRemaining,
     playerELO,
     startGame,
+    setDifficulty,
     resetGame,
     eloChange,
     player1Name,
@@ -30,9 +32,21 @@ export default function GamePage() {
 
   useEffect(() => {
     if (mode && gameState === "HOME") {
-      startGame(mode.toUpperCase());
+      // For PVE, show difficulty selector first
+      if (mode.toUpperCase() === "PVE") {
+        setShowDifficultySelector(true);
+      } else {
+        // For PVP, start immediately
+        startGame(mode.toUpperCase());
+      }
     }
   }, [mode, gameState, startGame]);
+
+  const handleDifficultySelect = (difficulty) => {
+    setDifficulty(difficulty);
+    setShowDifficultySelector(false);
+    startGame(mode.toUpperCase(), difficulty);
+  };
 
   const handleBackHome = () => {
     resetGame();
@@ -140,33 +154,24 @@ export default function GamePage() {
           {/* Game Info Bar */}
           <div className="flex items-center justify-between px-6 py-3 bg-gray-900/50 border-b border-gray-700">
             <div className="flex items-center gap-4">
-              <div
-                className={`px-4 py-2 rounded-lg ${
-                  currentPlayer === 1 ? "bg-green-600" : "bg-gray-700"
-                }`}
-              >
+              <div className="px-4 py-2 rounded-lg bg-green-600">
                 <div className="text-white font-bold">
-                  {player1Name}: {player1Score}
+                  {player1Name}: {player1Score}/10
                 </div>
               </div>
               <div className="text-gray-400">vs</div>
-              <div
-                className={`px-4 py-2 rounded-lg ${
-                  currentPlayer === 2 ? "bg-blue-600" : "bg-gray-700"
-                }`}
-              >
+              <div className="px-4 py-2 rounded-lg bg-gray-700">
                 <div className="text-white font-bold">
-                  {player2Name}: {player2Score}
+                  {player2Name}: {player2Score}/10
                 </div>
               </div>
             </div>
 
             <div className="flex items-center gap-4">
               <div className="text-center">
-                <div className="text-2xl font-bold text-white">
-                  {turnTimeRemaining}s
+                <div className="text-sm text-gray-400">
+                  First to 10 pucks wins
                 </div>
-                <div className="text-xs text-gray-400">Time Left</div>
               </div>
             </div>
           </div>
@@ -210,9 +215,9 @@ export default function GamePage() {
 
             <div className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-gray-400">Current Turn:</span>
+                <span className="text-gray-400">Game Type:</span>
                 <span className="text-white font-semibold">
-                  Player {currentPlayer}
+                  {mode?.toUpperCase() === "PVE" ? "vs AI" : "vs Player"}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -336,6 +341,13 @@ export default function GamePage() {
           </Card>
         </div>
       )}
+
+      {/* Difficulty Selector Modal */}
+      <DifficultySelector
+        isOpen={showDifficultySelector}
+        onSelect={handleDifficultySelect}
+        gameMode={mode?.toUpperCase()}
+      />
     </div>
   );
 }

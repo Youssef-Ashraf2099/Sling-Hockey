@@ -7,15 +7,14 @@ export const useGameStore = create((set, get) => ({
   difficulty: "MEDIUM", // 'EASY', 'MEDIUM', 'HARD' for PVE
 
   // Player info
-  currentPlayer: 1, // 1 or 2
-  player1Score: 0,
-  player2Score: 0,
+  player1Score: 0, // Number of pucks scored
+  player2Score: 0, // Number of pucks scored
   player1Name: "Player 1",
-  player2Name: "Player 2",
+  player2Name: "AI Opponent",
+  pucksCaught: { player1: 0, player2: 0 }, // Track which pucks have reached opponent side
 
-  // Turn management
-  turnStartTime: null,
-  turnTimeRemaining: 30,
+  // Game state (CONTINUOUS PLAY - NO TURNS)
+  aiThinking: false, // AI is calculating next move
 
   // Game stats
   gamesPlayed: 0,
@@ -44,41 +43,41 @@ export const useGameStore = create((set, get) => ({
       gameState: "PLAYING",
       gameMode: mode,
       difficulty,
-      currentPlayer: 1,
       player1Score: 0,
       player2Score: 0,
-      turnStartTime: Date.now(),
-      turnTimeRemaining: 30,
+      pucksCaught: { player1: 0, player2: 0 },
+      aiThinking: false,
     });
   },
 
+  // Set AI thinking state
+  setAiThinking: (thinking) => set({ aiThinking: thinking }),
+
+  // No turns - continuous play - fastest player wins
   switchTurn: () => {
-    const current = get().currentPlayer;
-    set({
-      currentPlayer: current === 1 ? 2 : 1,
-      turnStartTime: Date.now(),
-      turnTimeRemaining: 30,
-    });
+    // DISABLED - Game is continuous, fastest player to score 10 wins
   },
 
   scorePoint: (player) => {
+    const state = get();
+
+    // In the new system, scoring means winning (all balls on opponent side)
+    // So we immediately end the game
     if (player === 1) {
-      set((state) => ({
-        player1Score: state.player1Score + 1,
-        totalPucksScored: state.totalPucksScored + 1,
+      set((s) => ({
+        player1Score: 5, // Set to max to indicate win
+        totalPucksScored: s.totalPucksScored + 5,
       }));
     } else {
-      set((state) => ({
-        player2Score: state.player2Score + 1,
-        totalPucksScored: state.totalPucksScored + 1,
+      set((s) => ({
+        player2Score: 5, // Set to max to indicate win
+        totalPucksScored: s.totalPucksScored + 5,
       }));
     }
 
-    // Check for win condition
-    const { player1Score, player2Score } = get();
-    if (player1Score >= 5 || player2Score >= 5) {
-      get().endGame();
-    }
+    // Immediately end game - player has won
+    const newState = get();
+    newState.endGame();
   },
 
   endGame: () => {
@@ -131,30 +130,18 @@ export const useGameStore = create((set, get) => ({
     set({
       gameState: "HOME",
       gameMode: null,
-      currentPlayer: 1,
       player1Score: 0,
       player2Score: 0,
+      pucksCaught: { player1: 0, player2: 0 },
       turnStartTime: null,
       turnTimeRemaining: 30,
       eloChange: 0,
+      aiThinking: false,
     });
   },
 
   updateTurnTime: () => {
-    const { turnStartTime, turnTimeRemaining } = get();
-    if (turnStartTime) {
-      const elapsed = Math.floor((Date.now() - turnStartTime) / 1000);
-      const remaining = Math.max(0, 30 - elapsed);
-
-      if (remaining !== turnTimeRemaining) {
-        set({ turnTimeRemaining: remaining });
-
-        // Auto-switch turn if time runs out
-        if (remaining === 0) {
-          get().switchTurn();
-        }
-      }
-    }
+    // DISABLED - No turn system, continuous play only
   },
 
   // Stats getters

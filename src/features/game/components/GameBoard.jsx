@@ -1,26 +1,47 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import Matter from "matter-js";
 import { useResponsiveCanvas } from "../hooks/useResponsiveCanvas";
 import { usePhysicsEngine } from "../hooks/usePhysicsEngine";
 import { RenderSystem } from "../physics/RenderSystem";
+import { AIController } from "../physics/AIController";
 import { GAME_CONFIG } from "../../../core/config/gameConstants";
 import { useGameStore } from "../store/gameStore";
 
 export default function GameBoard({ theme }) {
   const { canvasRef, containerRef, dimensions, scale, screenToVirtual } =
     useResponsiveCanvas();
-  const { engine, getPuckAtPosition, applyForce, checkSlotScoring } =
+  const { engine, pucks, getPuckAtPosition, applyForce, checkSlotScoring } =
     usePhysicsEngine();
 
-  const { currentPlayer, scorePoint, switchTurn, updateTurnTime } =
-    useGameStore();
+  const {
+    gameMode,
+    difficulty,
+    scorePoint,
+    setAiThinking,
+    aiShoot,
+    updateTurnTime,
+  } = useGameStore();
 
   const [dragState, setDragState] = useState({
     isDragging: false,
     activePuck: null,
-    anchorPoint: null,
-    startPosition: null,
+    ropeAnchor: {
+      x: GAME_CONFIG.PLAYER_ROPE_ANCHOR_X,
+      y: GAME_CONFIG.PLAYER_ROPE_ANCHOR_Y,
+    }, // Fixed rope anchor for player
+    dragPosition: null, // Where player is dragging to
   });
+
+  const [allowPlayerShoot, setAllowPlayerShoot] = useState(true);
+  const aiControllerRef = useRef(null);
+  const winDetectedRef = useRef(false); // Prevent infinite loop on win
+
+  // Initialize AI controller
+  useEffect(() => {
+    if (gameMode === "PVE" && difficulty) {
+      aiControllerRef.current = new AIController(difficulty);
+    }
+  }, [gameMode, difficulty]);
 
   // Game loop with rendering
   useEffect(() => {
@@ -48,12 +69,26 @@ export default function GameBoard({ theme }) {
         }
       });
 
-      // Check for scoring
+      // Check for territory win condition
       const scored = checkSlotScoring();
-      if (scored.length > 0) {
-        scored.forEach(({ player }) => {
-          scorePoint(player);
+      if (scored.length > 0 && !winDetectedRef.current) {
+        // A player has won - all their balls are on opponent side
+        winDetectedRef.current = true; // Prevent re-triggering
+
+        scored.forEach(({ player, ballsOnOpponentSide }) => {
+          console.log(
+            `Player ${player} wins! All ${ballsOnOpponentSide} balls on opponent side!`
+          );
+          // Trigger immediate win
+          if (player === 1) {
+            scorePoint(1); // Trigger win for player 1
+          } else {
+            scorePoint(2); // Trigger win for player 2
+          }
         });
+
+        // Stop the game loop
+        return;
       }
 
       // Render frame
@@ -84,114 +119,186 @@ export default function GameBoard({ theme }) {
     updateTurnTime,
   ]);
 
-  // Pointer down - start drag
+  // Pointer down - grab puck and snap to rope anchor
   const handlePointerDown = useCallback(
     (e) => {
-      if (!engine) return;
+      if (!engine || dragState.isDragging) return;
 
       const virtual = screenToVirtual(e.clientX, e.clientY);
-      const puck = getPuckAtPosition(virtual.x, virtual.y);
 
-      if (puck && puck.customData) {
-        // Check if it's the current player's puck
-        if (puck.customData.player !== currentPlayer) {
-          return; // Can't move opponent's puck
+      // Find closest player 1 puck
+      const bodies = Matter.Composite.allBodies(engine.world);
+      let selectedPuck = null;
+      let minDistance = 60;
+
+      for (let body of bodies) {
+        if (!body.label.startsWith("puck-p1")) continue;
+
+        const dx = body.position.x - virtual.x;
+        const dy = body.position.y - virtual.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          selectedPuck = body;
         }
+      }
 
-        setDragState({
-          isDragging: true,
-          activePuck: puck,
-          anchorPoint: { x: puck.position.x, y: puck.position.y },
-          startPosition: { x: virtual.x, y: virtual.y },
-        });
+      if (selectedPuck && dragState.ropeAnchor) {
+        // Move puck to rope anchor position
+        const anchorPos = {
+          x: dragState.ropeAnchor.x,
+          y: dragState.ropeAnchor.y,
+        };
+        try {
+          Matter.Body.setPosition(selectedPuck, anchorPos);
+          Matter.Body.setVelocity(selectedPuck, { x: 0, y: 0 });
+          Matter.Body.setAngularVelocity(selectedPuck, 0);
 
-        // Make puck kinematic while dragging
-        Matter.Body.setStatic(puck, true);
+          setDragState((prev) => ({
+            ...prev,
+            isDragging: true,
+            activePuck: selectedPuck,
+            dragPosition: { x: anchorPos.x, y: anchorPos.y },
+          }));
+        } catch (err) {
+          console.error("Error setting puck position:", err);
+        }
       }
     },
-    [engine, screenToVirtual, getPuckAtPosition, currentPlayer]
+    [engine, screenToVirtual, dragState.isDragging, dragState.ropeAnchor]
   );
 
-  // Pointer move - drag puck
+  // Pointer move - show rope pull
   const handlePointerMove = useCallback(
     (e) => {
-      if (
-        !dragState.isDragging ||
-        !dragState.activePuck ||
-        !dragState.anchorPoint
-      )
-        return;
+      if (!dragState.isDragging || !dragState.activePuck) return;
 
       const virtual = screenToVirtual(e.clientX, e.clientY);
 
-      // Calculate distance from anchor
-      const dx = virtual.x - dragState.anchorPoint.x;
-      const dy = virtual.y - dragState.anchorPoint.y;
+      // Calculate distance from rope anchor
+      const dx = virtual.x - dragState.ropeAnchor.x;
+      const dy = virtual.y - dragState.ropeAnchor.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
       // Clamp to max stretch
+      let targetX = virtual.x;
+      let targetY = virtual.y;
+
       if (distance > GAME_CONFIG.MAX_STRETCH) {
         const angle = Math.atan2(dy, dx);
-        virtual.x =
-          dragState.anchorPoint.x + Math.cos(angle) * GAME_CONFIG.MAX_STRETCH;
-        virtual.y =
-          dragState.anchorPoint.y + Math.sin(angle) * GAME_CONFIG.MAX_STRETCH;
+        targetX =
+          dragState.ropeAnchor.x + Math.cos(angle) * GAME_CONFIG.MAX_STRETCH;
+        targetY =
+          dragState.ropeAnchor.y + Math.sin(angle) * GAME_CONFIG.MAX_STRETCH;
       }
 
-      // Move puck
-      Matter.Body.setPosition(dragState.activePuck, virtual);
+      // Update puck position and drag position for rope visual
+      if (dragState.activePuck) {
+        try {
+          Matter.Body.setPosition(dragState.activePuck, {
+            x: targetX,
+            y: targetY,
+          });
+          Matter.Body.setVelocity(dragState.activePuck, { x: 0, y: 0 });
+        } catch (err) {
+          console.error("Error updating puck position during drag:", err);
+          // If puck is invalid, stop dragging
+          setDragState((prev) => ({
+            ...prev,
+            isDragging: false,
+            activePuck: null,
+            dragPosition: null,
+          }));
+          return;
+        }
+      }
+
+      // Update drag position for rope visual
+      setDragState((prev) => ({
+        ...prev,
+        dragPosition: { x: targetX, y: targetY },
+      }));
     },
     [dragState, screenToVirtual]
   );
 
-  // Pointer up - release and apply force
+  // Pointer up - release rope and launch puck
   const handlePointerUp = useCallback(() => {
     if (
       !dragState.isDragging ||
       !dragState.activePuck ||
-      !dragState.anchorPoint
+      !dragState.dragPosition
     )
       return;
 
     const puck = dragState.activePuck;
 
-    // Make puck dynamic again
-    Matter.Body.setStatic(puck, false);
+    // Verify puck still exists in engine (check both player arrays)
+    const allPucks = [...(pucks.player1 || []), ...(pucks.player2 || [])];
+    if (!allPucks.includes(puck)) {
+      setDragState((prev) => ({
+        ...prev,
+        isDragging: false,
+        activePuck: null,
+        dragPosition: null,
+      }));
+      return;
+    }
 
-    // Calculate elastic force
-    const dx = dragState.anchorPoint.x - puck.position.x;
-    const dy = dragState.anchorPoint.y - puck.position.y;
+    // Calculate elastic force from rope anchor to current drag position
+    const dx = dragState.ropeAnchor.x - dragState.dragPosition.x;
+    const dy = dragState.ropeAnchor.y - dragState.dragPosition.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    // Apply force proportional to stretch distance
-    const forceMagnitude = distance * GAME_CONFIG.FORCE_MULTIPLIER;
-    const force = {
-      x: (dx / distance) * forceMagnitude * distance,
-      y: (dy / distance) * forceMagnitude * distance,
-    };
+    if (distance > 5) {
+      // Apply force proportional to stretch distance (with reduced multiplier)
+      const forceMagnitude = distance * GAME_CONFIG.FORCE_MULTIPLIER;
+      const force = {
+        x: (dx / distance) * forceMagnitude * distance,
+        y: (dy / distance) * forceMagnitude * distance,
+      };
 
-    applyForce(puck, force);
+      try {
+        applyForce(puck, force);
+      } catch (err) {
+        console.error("Error applying force to puck:", err);
+      }
 
-    // Clear drag state
-    setDragState({
+      // If PVE mode, trigger AI response (non-blocking)
+      if (
+        gameMode === "PVE" &&
+        aiControllerRef.current &&
+        !aiControllerRef.current.isShooting
+      ) {
+        // AI plays asynchronously without blocking player
+        setTimeout(async () => {
+          try {
+            aiControllerRef.current.isShooting = true;
+            await aiControllerRef.current.executeShot(
+              pucks,
+              engine,
+              applyForce
+            );
+          } catch (error) {
+            console.error("AI shot error:", error);
+          } finally {
+            aiControllerRef.current.isShooting = false;
+          }
+        }, 800); // Faster AI response
+      }
+    }
+
+    // Clear drag state immediately - don't wait for AI
+    setDragState((prev) => ({
+      ...prev,
+      isDragging: false,
+      ...prev,
       isDragging: false,
       activePuck: null,
-      anchorPoint: null,
-      startPosition: null,
-    });
-
-    // Switch turn after a delay (allow physics to settle)
-    setTimeout(() => {
-      const bodies = Matter.Composite.allBodies(engine.world);
-      const allSleeping = bodies
-        .filter((b) => b.label.startsWith("puck"))
-        .every((b) => b.isSleeping || b.speed < 0.5);
-
-      if (allSleeping) {
-        switchTurn();
-      }
-    }, 2000);
-  }, [dragState, applyForce, engine, switchTurn]);
+      dragPosition: null,
+    }));
+  }, [dragState, applyForce, gameMode, engine, pucks, setAiThinking]);
 
   // Cancel drag if pointer leaves
   const handlePointerLeave = useCallback(() => {

@@ -274,41 +274,53 @@ export function usePhysicsEngine() {
   };
 
   const checkSlotScoring = () => {
-    const { SLOT_WIDTH, SLOT_Y, DIVIDER_THICKNESS, PUCK_RADIUS } = GAME_CONFIG;
+    // Legacy function - now checks territory-based win condition
+    const { SLOT_Y, VIRTUAL_HEIGHT } = GAME_CONFIG;
     const bodies = Matter.Composite.allBodies(worldRef.current);
-    const scored = [];
+
+    // Count balls on each side
+    let player1BallsOnAISide = 0; // White balls on top (AI territory)
+    let player2BallsOnPlayerSide = 0; // Black balls on bottom (Player territory)
+
+    let totalPlayer1Balls = 0;
+    let totalPlayer2Balls = 0;
 
     bodies.forEach((body) => {
       if (!body.label.startsWith("puck")) return;
 
-      const inSlotX =
-        Math.abs(body.position.x - GAME_CONFIG.VIRTUAL_WIDTH / 2) <
-        SLOT_WIDTH / 2;
-      const inSlotY =
-        Math.abs(body.position.y - SLOT_Y) < DIVIDER_THICKNESS + PUCK_RADIUS;
+      const isPlayer1Ball = body.label.startsWith("puck-p1");
+      const isPlayer2Ball = body.label.startsWith("puck-p2");
 
-      // Check if puck passed through slot
-      const passedThrough =
-        inSlotX && body.customData && !body.customData.scored;
-
-      if (passedThrough) {
-        // Determine which side puck came from
-        const fromTop = body.position.y < SLOT_Y;
-        const fromBottom = body.position.y > SLOT_Y;
-
-        if (
-          (fromTop && body.customData.player === 2) ||
-          (fromBottom && body.customData.player === 1)
-        ) {
-          body.customData.scored = true;
-          scored.push({
-            puck: body,
-            player: body.customData.player,
-            team: body.customData.team,
-          });
+      if (isPlayer1Ball) {
+        totalPlayer1Balls++;
+        // Check if white ball is on AI side (top half, y < center)
+        if (body.position.y < SLOT_Y) {
+          player1BallsOnAISide++;
+        }
+      } else if (isPlayer2Ball) {
+        totalPlayer2Balls++;
+        // Check if black ball is on Player side (bottom half, y > center)
+        if (body.position.y > SLOT_Y) {
+          player2BallsOnPlayerSide++;
         }
       }
     });
+
+    // Check win conditions: all balls on opponent side
+    const scored = [];
+
+    // Player 1 (white) wins if all their balls are on AI side (top)
+    if (totalPlayer1Balls > 0 && player1BallsOnAISide === totalPlayer1Balls) {
+      scored.push({ player: 1, ballsOnOpponentSide: player1BallsOnAISide });
+    }
+
+    // Player 2 (AI/black) wins if all their balls are on Player side (bottom)
+    if (
+      totalPlayer2Balls > 0 &&
+      player2BallsOnPlayerSide === totalPlayer2Balls
+    ) {
+      scored.push({ player: 2, ballsOnOpponentSide: player2BallsOnPlayerSide });
+    }
 
     return scored;
   };

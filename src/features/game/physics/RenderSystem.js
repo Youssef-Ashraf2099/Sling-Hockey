@@ -29,7 +29,11 @@ export class RenderSystem {
     // Draw all static bodies (walls, divider)
     this.drawStaticBodies(engine, theme);
 
-    // Draw elastic band if dragging
+    // Draw rope anchors (slingshots for both players)
+    this.drawRopeAnchor(ctx, "player");
+    this.drawRopeAnchor(ctx, "ai");
+
+    // Draw elastic band (rope) if dragging
     if (dragState && dragState.isDragging) {
       this.drawElasticBand(ctx, dragState);
     }
@@ -98,65 +102,124 @@ export class RenderSystem {
     });
   }
 
+  drawRopeAnchor(ctx, side = "player") {
+    const { scale } = this;
+    const {
+      PLAYER_ROPE_ANCHOR_X,
+      PLAYER_ROPE_ANCHOR_Y,
+      AI_ROPE_ANCHOR_X,
+      AI_ROPE_ANCHOR_Y,
+      VIRTUAL_WIDTH,
+    } = GAME_CONFIG;
+
+    // Choose anchor position based on side
+    const anchorX = side === "player" ? PLAYER_ROPE_ANCHOR_X : AI_ROPE_ANCHOR_X;
+    const anchorY = side === "player" ? PLAYER_ROPE_ANCHOR_Y : AI_ROPE_ANCHOR_Y;
+
+    const centerX = anchorX * scale.x;
+    const centerY = anchorY * scale.y;
+
+    // Slingshot width (distance between anchor points)
+    const slingshotWidth = 200 * scale.x;
+    const leftX = centerX - slingshotWidth / 2;
+    const rightX = centerX + slingshotWidth / 2;
+
+    // Slingshot anchor points (where the bands attach)
+    const offset = side === "player" ? -20 : 20; // Player goes up, AI goes down
+    const anchorPointY = centerY + offset * scale.y;
+
+    ctx.save();
+
+    // Draw left anchor post
+    ctx.fillStyle = "rgba(139, 69, 19, 0.8)"; // Brown
+    ctx.beginPath();
+    ctx.arc(leftX, anchorPointY, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw right anchor post
+    ctx.beginPath();
+    ctx.arc(rightX, anchorPointY, 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Removed resting band - only show when dragging
+
+    ctx.restore();
+  }
+
   drawElasticBand(ctx, dragState) {
     const { scale } = this;
-    const { anchorPoint, activePuck } = dragState;
+    const { ropeAnchor, activePuck, dragPosition } = dragState;
 
-    if (!anchorPoint || !activePuck) return;
+    if (!ropeAnchor || !activePuck || !dragPosition) return;
 
-    const ax = anchorPoint.x * scale.x;
-    const ay = anchorPoint.y * scale.y;
-    const px = activePuck.position.x * scale.x;
-    const py = activePuck.position.y * scale.y;
+    const centerX = ropeAnchor.x * scale.x;
+    const centerY = ropeAnchor.y * scale.y;
 
-    // Calculate distance for dynamic curve
-    const dx = px - ax;
-    const dy = py - ay;
+    // Slingshot anchor points (matching drawRopeAnchor)
+    const slingshotWidth = 200 * scale.x;
+    const leftX = centerX - slingshotWidth / 2;
+    const rightX = centerX + slingshotWidth / 2;
+    const anchorY = centerY - 20 * scale.y;
+
+    const px = dragPosition.x * scale.x;
+    const py = dragPosition.y * scale.y;
+
+    // Calculate distance for stretch feedback
+    const dx = px - centerX;
+    const dy = py - centerY;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
-    // Control point for quadratic curve
-    const offset = Math.min(distance * 0.25, 60);
-    const perpX = -dy / (distance || 1);
-    const perpY = dx / (distance || 1);
-
-    const mx = (ax + px) / 2;
-    const my = (ay + py) / 2;
-    const cx = mx + perpX * offset;
-    const cy = my + perpY * offset;
-
-    // Stretch percentage for color
+    // Stretch percentage for visual feedback
     const stretchPercent = Math.min(
       (distance / (GAME_CONFIG.MAX_STRETCH * scale.x)) * 100,
       100
     );
-    let bandColor = "#000000";
+
+    // Color based on stretch
+    let ropeColor = "#654321"; // Brown
+    let ropeWidth = 4;
+
     if (stretchPercent > 80) {
-      bandColor = "#ef4444"; // Red at max stretch
+      ropeColor = "#ef4444"; // Red at max stretch
+      ropeWidth = 6;
     } else if (stretchPercent > 50) {
-      bandColor = "#fb923c"; // Orange at medium
+      ropeColor = "#fb923c"; // Orange at medium
+      ropeWidth = 5;
     }
 
-    // Draw band with shadow
     ctx.save();
-    ctx.shadowColor = "rgba(0, 0, 0, 0.4)";
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
-
-    ctx.beginPath();
-    ctx.moveTo(ax, ay);
-    ctx.quadraticCurveTo(cx, cy, px, py);
-    ctx.strokeStyle = bandColor;
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = ropeColor;
+    ctx.lineWidth = ropeWidth;
     ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    // Draw LEFT band (from left anchor to ball)
+    ctx.beginPath();
+    ctx.moveTo(leftX, anchorY);
+    ctx.lineTo(px, py);
+    ctx.stroke();
+
+    // Draw RIGHT band (from right anchor to ball)
+    ctx.beginPath();
+    ctx.moveTo(rightX, anchorY);
+    ctx.lineTo(px, py);
     ctx.stroke();
 
     ctx.restore();
 
-    // Draw anchor point
+    // Draw ball highlight at drag position
+    ctx.save();
     ctx.beginPath();
-    ctx.arc(ax, ay, 6, 0, Math.PI * 2);
-    ctx.fillStyle = "#000000";
-    ctx.fill();
+    ctx.arc(px, py, (GAME_CONFIG.PUCK_RADIUS + 3) * scale.x, 0, Math.PI * 2);
+    ctx.strokeStyle = ropeColor;
+    ctx.lineWidth = 3;
+    ctx.globalAlpha = 0.5;
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawPucks(engine) {
