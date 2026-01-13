@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import Matter from "matter-js";
 import {
   GAME_CONFIG,
@@ -11,6 +11,7 @@ export function usePhysicsEngine() {
   const engineRef = useRef(null);
   const worldRef = useRef(null);
   const pucksRef = useRef({ player1: [], player2: [] });
+  const dividersRef = useRef({ left: null, right: null, cornerLeft: null, cornerRight: null });
   const { getCurrentSkinData } = useShopStore();
 
   useEffect(() => {
@@ -131,14 +132,15 @@ export function usePhysicsEngine() {
       DIVIDER_FRICTION,
     } = GAME_CONFIG;
 
-    const leftDividerWidth = (VIRTUAL_WIDTH - SLOT_WIDTH) / 2;
-    const rightDividerWidth = leftDividerWidth;
+    // Widened divider segments to ensure no gaps at edges during movement
+    // Each segment is now wide enough to cover the whole width if needed
+    const segmentWidth = VIRTUAL_WIDTH;
 
     // Left divider segment
     const dividerLeft = Matter.Bodies.rectangle(
-      leftDividerWidth / 2,
+      -segmentWidth / 2 + (VIRTUAL_WIDTH - SLOT_WIDTH) / 2,
       SLOT_Y,
-      leftDividerWidth,
+      segmentWidth,
       DIVIDER_THICKNESS,
       {
         isStatic: true,
@@ -151,9 +153,9 @@ export function usePhysicsEngine() {
 
     // Right divider segment
     const dividerRight = Matter.Bodies.rectangle(
-      VIRTUAL_WIDTH - rightDividerWidth / 2,
+      segmentWidth / 2 + (VIRTUAL_WIDTH + SLOT_WIDTH) / 2,
       SLOT_Y,
-      rightDividerWidth,
+      segmentWidth,
       DIVIDER_THICKNESS,
       {
         isStatic: true,
@@ -191,12 +193,38 @@ export function usePhysicsEngine() {
       }
     );
 
+    dividersRef.current = {
+      left: dividerLeft,
+      right: dividerRight,
+      cornerLeft,
+      cornerRight,
+    };
+
     Matter.Composite.add(world, [
       dividerLeft,
       dividerRight,
       cornerLeft,
       cornerRight,
     ]);
+  };
+
+  const updateDivider = (slotOffsetX) => {
+    if (!dividersRef.current.left) return;
+
+    const { VIRTUAL_WIDTH, SLOT_WIDTH, SLOT_Y } = GAME_CONFIG;
+    const { left, right, cornerLeft, cornerRight } = dividersRef.current;
+
+    // Shift everything by slotOffsetX
+    const segmentWidth = VIRTUAL_WIDTH;
+    const newLeftX = -segmentWidth / 2 + (VIRTUAL_WIDTH - SLOT_WIDTH) / 2 + slotOffsetX;
+    const newRightX = segmentWidth / 2 + (VIRTUAL_WIDTH + SLOT_WIDTH) / 2 + slotOffsetX;
+    const newCornerLeftX = (VIRTUAL_WIDTH - SLOT_WIDTH) / 2 + slotOffsetX;
+    const newCornerRightX = (VIRTUAL_WIDTH + SLOT_WIDTH) / 2 + slotOffsetX;
+
+    Matter.Body.setPosition(left, { x: newLeftX, y: SLOT_Y });
+    Matter.Body.setPosition(right, { x: newRightX, y: SLOT_Y });
+    Matter.Body.setPosition(cornerLeft, { x: newCornerLeftX, y: SLOT_Y });
+    Matter.Body.setPosition(cornerRight, { x: newCornerRightX, y: SLOT_Y });
   };
 
   const createPucks = (world) => {
@@ -257,12 +285,13 @@ export function usePhysicsEngine() {
     });
   };
 
-  const applyForce = (puck, force) => {
+  const applyForce = useCallback((puck, force) => {
     if (!puck || !force) return;
     Matter.Body.applyForce(puck, puck.position, force);
-  };
+  }, []);
 
-  const getPuckAtPosition = (x, y, radius = 30) => {
+  const getPuckAtPosition = useCallback((x, y, radius = 30) => {
+    if (!worldRef.current) return null;
     const bodies = Matter.Composite.allBodies(worldRef.current);
     return bodies.find((body) => {
       if (!body.label.startsWith("puck")) return false;
@@ -271,9 +300,10 @@ export function usePhysicsEngine() {
       const distance = Math.sqrt(dx * dx + dy * dy);
       return distance <= radius;
     });
-  };
+  }, []);
 
-  const checkSlotScoring = () => {
+  const checkSlotScoring = useCallback(() => {
+    if (!worldRef.current) return [];
     // Legacy function - now checks territory-based win condition
     const { SLOT_Y, VIRTUAL_HEIGHT } = GAME_CONFIG;
     const bodies = Matter.Composite.allBodies(worldRef.current);
@@ -323,9 +353,10 @@ export function usePhysicsEngine() {
     }
 
     return scored;
-  };
+  }, []);
 
-  const resetPucks = () => {
+  const resetPucks = useCallback(() => {
+    if (!worldRef.current) return;
     // Remove existing pucks
     pucksRef.current.player1.forEach((puck) => {
       Matter.Composite.remove(worldRef.current, puck);
@@ -338,7 +369,7 @@ export function usePhysicsEngine() {
 
     // Recreate pucks
     createPucks(worldRef.current);
-  };
+  }, [getCurrentSkinData]);
 
   return {
     engine: engineRef.current,
@@ -348,5 +379,6 @@ export function usePhysicsEngine() {
     getPuckAtPosition,
     checkSlotScoring,
     resetPucks,
+    updateDivider,
   };
 }

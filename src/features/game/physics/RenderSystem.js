@@ -9,14 +9,16 @@ export class RenderSystem {
     this.frame = 0;
   }
 
-  render(engine, dragState = null, theme = null) {
+  render(engine, dragState = null, theme = null, options = {}) {
     if (!engine || !this.ctx) return;
 
     const ctx = this.ctx;
     const { COLORS } = GAME_CONFIG;
     const bgColor = theme?.backgroundColor || COLORS.WOOD_BIRCH;
+    const { hideRope = false, slotOffsetX = 0 } = options; // Hide rope when opponent plays, slot offset for animation
 
     this.frame++;
+    this.slotOffsetX = slotOffsetX; // Store for use in drawSlotMarkers
 
     // Clear and draw background
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -29,19 +31,25 @@ export class RenderSystem {
     // Draw all static bodies (walls, divider)
     this.drawStaticBodies(engine, theme);
 
-    // Draw rope anchors (slingshots for both players)
-    this.drawRopeAnchor(ctx, "player");
-    this.drawRopeAnchor(ctx, "ai");
+    // Draw rope anchors (horizontal red lines)
+    if (!hideRope) {
+      // Only draw wobble/resting line if NOT stretching on that side
+      const playerStretching = dragState && dragState.isDragging && (dragState.dragPosition.y > GAME_CONFIG.PLAYER_ROPE_Y);
+      const aiStretching = dragState && dragState.isDragging && (dragState.dragPosition.y < GAME_CONFIG.AI_ROPE_Y);
+      
+      if (!playerStretching) this.drawRopeWithWobble(ctx, "player", dragState);
+      if (!aiStretching) this.drawRopeWithWobble(ctx, "ai", dragState);
+    }
 
     // Draw elastic band (rope) if dragging
-    if (dragState && dragState.isDragging) {
+    if (dragState && dragState.isDragging && !hideRope) {
       this.drawElasticBand(ctx, dragState);
     }
 
     // Draw all pucks
     this.drawPucks(engine);
 
-    // Draw slot markers
+    // Draw slot markers with animation
     this.drawSlotMarkers(ctx);
   }
 
@@ -102,124 +110,101 @@ export class RenderSystem {
     });
   }
 
-  drawRopeAnchor(ctx, side = "player") {
+  drawRopeWithWobble(ctx, side = "player", dragState = null) {
     const { scale } = this;
-    const {
-      PLAYER_ROPE_ANCHOR_X,
-      PLAYER_ROPE_ANCHOR_Y,
-      AI_ROPE_ANCHOR_X,
-      AI_ROPE_ANCHOR_Y,
-      VIRTUAL_WIDTH,
-    } = GAME_CONFIG;
+    const { PLAYER_ROPE_Y, AI_ROPE_Y, VIRTUAL_WIDTH, COLORS } = GAME_CONFIG;
 
-    // Choose anchor position based on side
-    const anchorX = side === "player" ? PLAYER_ROPE_ANCHOR_X : AI_ROPE_ANCHOR_X;
-    const anchorY = side === "player" ? PLAYER_ROPE_ANCHOR_Y : AI_ROPE_ANCHOR_Y;
+    const y = side === "player" ? PLAYER_ROPE_Y : AI_ROPE_Y;
+    const canvasY = y * scale.y;
+    const vw = VIRTUAL_WIDTH * scale.x;
 
-    const centerX = anchorX * scale.x;
-    const centerY = anchorY * scale.y;
+    let wobbleY = 0;
 
-    // Slingshot width (distance between anchor points)
-    const slingshotWidth = 200 * scale.x;
-    const leftX = centerX - slingshotWidth / 2;
-    const rightX = centerX + slingshotWidth / 2;
+    // Check if we are in a rebound state
+    if (dragState && dragState.reboundTime > 0 && dragState.reboundSide === side) {
+      const elapsed = Date.now() - dragState.reboundTime;
+      const duration = 1000;
 
-    // Slingshot anchor points (where the bands attach)
-    const offset = side === "player" ? -20 : 20; // Player goes up, AI goes down
-    const anchorPointY = centerY + offset * scale.y;
+      if (elapsed < duration) {
+        const amplitude = 50 * (1 - elapsed / duration) * scale.y;
+        const frequency = 0.05;
+        wobbleY = Math.sin(elapsed * frequency) * amplitude;
+      }
+    }
 
     ctx.save();
-
-    // Draw left anchor post
-    ctx.fillStyle = "rgba(139, 69, 19, 0.8)"; // Brown
-    ctx.beginPath();
-    ctx.arc(leftX, anchorPointY, 10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "rgba(0, 0, 0, 0.9)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Draw right anchor post
-    ctx.beginPath();
-    ctx.arc(rightX, anchorPointY, 10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Removed resting band - only show when dragging
-
+    ctx.strokeStyle = COLORS.ROPE;
+    ctx.lineWidth = 10 * scale.x; // Match base stretched thickness
+    ctx.lineCap = "round";
+    
+    if (Math.abs(wobbleY) > 0.1) {
+      ctx.beginPath();
+      ctx.moveTo(0, canvasY);
+      ctx.quadraticCurveTo(vw / 2, canvasY + wobbleY, vw, canvasY);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(0, canvasY);
+      ctx.lineTo(vw, canvasY);
+      ctx.stroke();
+    }
+    
     ctx.restore();
   }
 
   drawElasticBand(ctx, dragState) {
     const { scale } = this;
-    const { ropeAnchor, activePuck, dragPosition } = dragState;
+    const { activePuck, dragPosition } = dragState;
 
-    if (!ropeAnchor || !activePuck || !dragPosition) return;
+    if (!activePuck || !dragPosition) return;
 
-    const centerX = ropeAnchor.x * scale.x;
-    const centerY = ropeAnchor.y * scale.y;
-
-    // Slingshot anchor points (matching drawRopeAnchor)
-    const slingshotWidth = 200 * scale.x;
-    const leftX = centerX - slingshotWidth / 2;
-    const rightX = centerX + slingshotWidth / 2;
-    const anchorY = centerY - 20 * scale.y;
-
+    const { PLAYER_ROPE_Y, AI_ROPE_Y, VIRTUAL_WIDTH, COLORS, PUCK_RADIUS } = GAME_CONFIG;
+    
+    // Determine which side we're on based on position
+    const isPlayerSide = dragPosition.y > GAME_CONFIG.SLOT_Y;
+    const ropeY = isPlayerSide ? PLAYER_ROPE_Y : AI_ROPE_Y;
+    
     const px = dragPosition.x * scale.x;
     const py = dragPosition.y * scale.y;
+    const r = PUCK_RADIUS * scale.x;
+    const ry = ropeY * scale.y;
+    const vw = VIRTUAL_WIDTH * scale.x;
 
-    // Calculate distance for stretch feedback
-    const dx = px - centerX;
-    const dy = py - centerY;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    // Only draw stretch if puck is pushing against the rope
+    const stretchDist = isPlayerSide ? (dragPosition.y - ropeY) : (ropeY - dragPosition.y);
+    const isStretching = stretchDist > 0;
 
-    // Stretch percentage for visual feedback
-    const stretchPercent = Math.min(
-      (distance / (GAME_CONFIG.MAX_STRETCH * scale.x)) * 100,
-      100
-    );
+    if (isStretching) {
+      // Dynamic thickness: decreases slightly as stretch increases
+      const baseWidth = 10 * scale.x;
+      const thickness = Math.max(4, baseWidth * (1 - (stretchDist / 1200)));
 
-    // Color based on stretch
-    let ropeColor = "#654321"; // Brown
-    let ropeWidth = 4;
+      ctx.save();
+      ctx.strokeStyle = COLORS.ROPE;
+      ctx.lineWidth = thickness;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
 
-    if (stretchPercent > 80) {
-      ropeColor = "#ef4444"; // Red at max stretch
-      ropeWidth = 6;
-    } else if (stretchPercent > 50) {
-      ropeColor = "#fb923c"; // Orange at medium
-      ropeWidth = 5;
+      // Draw the rope as two straight segments to the puck for a "normal" tension feel
+      ctx.beginPath();
+      ctx.moveTo(0, ry);
+      
+      // We go to the edge of the puck to make it look like it's wrapping
+      ctx.lineTo(px, py);
+      ctx.lineTo(vw, ry);
+      
+      ctx.stroke();
+      ctx.restore();
+
+      // Draw puck highlight
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(px, py, (PUCK_RADIUS + 2) * scale.x, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.restore();
     }
-
-    ctx.save();
-    ctx.strokeStyle = ropeColor;
-    ctx.lineWidth = ropeWidth;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    // Draw LEFT band (from left anchor to ball)
-    ctx.beginPath();
-    ctx.moveTo(leftX, anchorY);
-    ctx.lineTo(px, py);
-    ctx.stroke();
-
-    // Draw RIGHT band (from right anchor to ball)
-    ctx.beginPath();
-    ctx.moveTo(rightX, anchorY);
-    ctx.lineTo(px, py);
-    ctx.stroke();
-
-    ctx.restore();
-
-    // Draw ball highlight at drag position
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(px, py, (GAME_CONFIG.PUCK_RADIUS + 3) * scale.x, 0, Math.PI * 2);
-    ctx.strokeStyle = ropeColor;
-    ctx.lineWidth = 3;
-    ctx.globalAlpha = 0.5;
-    ctx.stroke();
-    ctx.restore();
   }
 
   drawPucks(engine) {
@@ -264,16 +249,31 @@ export class RenderSystem {
   drawSlotMarkers(ctx) {
     const { scale } = this;
     const { VIRTUAL_WIDTH, SLOT_Y, SLOT_WIDTH } = GAME_CONFIG;
+    const slotOffsetX = this.slotOffsetX || 0;
 
-    const slotLeftX = (VIRTUAL_WIDTH - SLOT_WIDTH) / 2;
-    const slotRightX = (VIRTUAL_WIDTH + SLOT_WIDTH) / 2;
+    // Apply slot offset for moving animation
+    const slotLeftX = (VIRTUAL_WIDTH - SLOT_WIDTH) / 2 + slotOffsetX;
+    const slotRightX = (VIRTUAL_WIDTH + SLOT_WIDTH) / 2 + slotOffsetX;
+    const slotCenterX = (VIRTUAL_WIDTH / 2) + slotOffsetX;
     const slotY = SLOT_Y;
 
-    // Draw subtle slot markers
-    ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+    // Draw slot markers with offset
+    ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
     ctx.font = "14px Inter";
     ctx.textAlign = "center";
-    ctx.fillText("⬇", (VIRTUAL_WIDTH / 2) * scale.x, (slotY - 30) * scale.y);
-    ctx.fillText("⬆", (VIRTUAL_WIDTH / 2) * scale.x, (slotY + 40) * scale.y);
+    ctx.fillText("⬇", slotCenterX * scale.x, (slotY - 30) * scale.y);
+    ctx.fillText("⬆", slotCenterX * scale.x, (slotY + 40) * scale.y);
+
+    // Draw slot boundary (highlight moving slot)
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(
+      slotLeftX * scale.x,
+      (slotY - 40) * scale.y,
+      SLOT_WIDTH * scale.x,
+      80 * scale.y
+    );
+    ctx.setLineDash([]); // Reset line dash
   }
 }

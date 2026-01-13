@@ -5,6 +5,10 @@ export const useGameStore = create((set, get) => ({
   gameState: "HOME", // 'HOME', 'MATCHMAKING', 'PLAYING', 'RESULT'
   gameMode: null, // 'PVP', 'PVE'
   difficulty: "MEDIUM", // 'EASY', 'MEDIUM', 'HARD' for PVE
+  
+  // Game rules
+  gameRule: "OWN_BALLS", // 'OWN_BALLS' - win when all own balls on opponent side, 'ALL_BALLS' - win when all 10 balls on your side
+  hideRopeDuringPlay: true, // Hide rope when opponent plays
 
   // Player info
   player1Score: 0, // Number of pucks scored
@@ -15,6 +19,8 @@ export const useGameStore = create((set, get) => ({
 
   // Game state (CONTINUOUS PLAY - NO TURNS)
   aiThinking: false, // AI is calculating next move
+  isPlayerPlaying: false, // Track if player is currently playing
+  isAIPlaying: false, // Track if AI is currently playing
 
   // Game stats
   gamesPlayed: 0,
@@ -37,16 +43,27 @@ export const useGameStore = create((set, get) => ({
   setGameMode: (mode) => set({ gameMode: mode }),
 
   setDifficulty: (difficulty) => set({ difficulty }),
+  
+  setGameRule: (rule) => set({ gameRule: rule }),
+  
+  setHideRopeDuringPlay: (hide) => set({ hideRopeDuringPlay: hide }),
+  
+  setIsPlayerPlaying: (playing) => set({ isPlayerPlaying: playing }),
+  
+  setIsAIPlaying: (playing) => set({ isAIPlaying: playing }),
 
-  startGame: (mode, difficulty = "MEDIUM") => {
+  startGame: (mode, difficulty = "MEDIUM", rule = "OWN_BALLS") => {
     set({
       gameState: "PLAYING",
       gameMode: mode,
       difficulty,
+      gameRule: rule,
       player1Score: 0,
       player2Score: 0,
       pucksCaught: { player1: 0, player2: 0 },
       aiThinking: false,
+      isPlayerPlaying: false,
+      isAIPlaying: false,
     });
   },
 
@@ -55,7 +72,7 @@ export const useGameStore = create((set, get) => ({
 
   // No turns - continuous play - fastest player wins
   switchTurn: () => {
-    // DISABLED - Game is continuous, fastest player to score 10 wins
+    // DISABLED - Game is continuous, fastest player to score wins
   },
 
   scorePoint: (player) => {

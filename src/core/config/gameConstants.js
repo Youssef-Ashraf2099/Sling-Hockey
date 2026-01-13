@@ -1,7 +1,7 @@
 export const GAME_CONFIG = {
   // Virtual coordinate system
-  VIRTUAL_WIDTH: 1000,
-  VIRTUAL_HEIGHT: 1800, // Increased from 1600 to give more space
+  VIRTUAL_WIDTH: 1200, // Increased from 1000 to use more horizontal space
+  VIRTUAL_HEIGHT: 1800,
 
   // Physics
   GRAVITY: { x: 0, y: 0 },
@@ -17,11 +17,10 @@ export const GAME_CONFIG = {
   ELASTIC_STIFFNESS: 0.1,
   ELASTIC_DAMPING: 0.05,
 
-  // Rope anchors (slingshots for player and AI) - moved away from edges
-  PLAYER_ROPE_ANCHOR_Y: 1600, // Moved up from 1480 (away from bottom edge)
-  PLAYER_ROPE_ANCHOR_X: 500, // Center of player area
-  AI_ROPE_ANCHOR_Y: 200, // Moved down from 120 (away from top edge)
-  AI_ROPE_ANCHOR_X: 500, // Center of AI area
+  // Rope anchors (horizontal red lines) - moved towards center for more pull space
+  PLAYER_ROPE_Y: 1450, // Moved up from 1650 to give 350 units of pull space
+  AI_ROPE_Y: 350,   // Moved down from 150 to give 350 units of pull space
+  ROPE_STIFFNESS: 0.1,
 
   // Backward compatibility
   ROPE_ANCHOR_Y: 1600,
@@ -32,6 +31,12 @@ export const GAME_CONFIG = {
   SLOT_Y: 900, // Center line - adjusted for new height
   CORNER_RADIUS: 15,
   DIVIDER_THICKNESS: 15,
+  
+  // Dynamic slot movement (challenge feature)
+  ENABLE_MOVING_SLOT: true, // Enable/disable slot movement
+  SLOT_MOVE_DELAY: 5000, // Reduced from 10000 to start moving sooner (set to 5s)
+  SLOT_MOVE_RANGE: 400, // Increased from 200 for more challenge
+  SLOT_MOVE_SPEED: 0.004, // Used as frequency in sine wave
 
   // Walls
   WALL_THICKNESS: 30,
@@ -58,6 +63,7 @@ export const GAME_CONFIG = {
     PUCK_WHITE: "#ffffff",
     PUCK_BLACK: "#1f1f1f",
     DIVIDER: "#8b4513",
+    ROPE: "#ff0000", // Red rope as requested
   },
 
   // Game rules
@@ -68,9 +74,9 @@ export const GAME_CONFIG = {
 
   // AI difficulty settings
   AI_DIFFICULTY: {
-    EASY: { delay: 1500, accuracy: 0.7, maxStretch: 200 },
-    MEDIUM: { delay: 1000, accuracy: 0.85, maxStretch: 250 },
-    HARD: { delay: 600, accuracy: 0.95, maxStretch: 300 },
+    EASY: { delay: 0, accuracy: 0.7, maxStretch: 200 },
+    MEDIUM: { delay: 0, accuracy: 0.85, maxStretch: 250 },
+    HARD: { delay: 0, accuracy: 0.95, maxStretch: 300 },
   },
 };
 
@@ -78,26 +84,26 @@ export const PLAYER_POSITIONS = {
   PLAYER_1: {
     // Bottom player (white pucks)
     pucks: [
-      { x: 200, y: 1550 },
-      { x: 400, y: 1550 },
-      { x: 500, y: 1600 },
-      { x: 600, y: 1550 },
-      { x: 800, y: 1550 },
+      { x: 300, y: 1300 },
+      { x: 500, y: 1300 },
+      { x: 600, y: 1350 },
+      { x: 700, y: 1300 },
+      { x: 900, y: 1300 },
     ],
-    anchorY: 1650,
+    anchorY: 1500,
     color: GAME_CONFIG.COLORS.PUCK_WHITE,
     team: "white",
   },
   PLAYER_2: {
     // Top player (black pucks)
     pucks: [
-      { x: 200, y: 250 },
-      { x: 400, y: 250 },
-      { x: 500, y: 200 },
-      { x: 600, y: 250 },
-      { x: 800, y: 250 },
+      { x: 300, y: 500 },
+      { x: 500, y: 500 },
+      { x: 600, y: 450 },
+      { x: 700, y: 500 },
+      { x: 900, y: 500 },
     ],
-    anchorY: 150,
+    anchorY: 300,
     color: GAME_CONFIG.COLORS.PUCK_BLACK,
     team: "black",
   },

@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Matter from "matter-js";
 import { useResponsiveCanvas } from "../hooks/useResponsiveCanvas";
 import { usePhysicsEngine } from "../hooks/usePhysicsEngine";
+import { useSlotAnimation } from "../../../core/physics/useSlotAnimation";
 import { RenderSystem } from "../physics/RenderSystem";
 import { AIController } from "../physics/AIController";
 import { GAME_CONFIG } from "../../../core/config/gameConstants";
@@ -10,8 +11,21 @@ import { useGameStore } from "../store/gameStore";
 export default function GameBoard({ theme }) {
   const { canvasRef, containerRef, dimensions, scale, screenToVirtual } =
     useResponsiveCanvas();
-  const { engine, pucks, getPuckAtPosition, applyForce, checkSlotScoring } =
+  const { engine, pucks, getPuckAtPosition, applyForce, checkSlotScoring, updateDivider } =
     usePhysicsEngine();
+  
+  const { gameState } = useGameStore();
+  const isGameActive = gameState === "PLAYING";
+  const { playerSlotX, aiSlotX, slotOffsetX, isMoving } = useSlotAnimation(isGameActive);
+  const slotOffsetRef = useRef(0);
+  
+  // Sync physics divider with slot animation
+  useEffect(() => {
+    slotOffsetRef.current = slotOffsetX;
+    if (updateDivider) {
+      updateDivider(slotOffsetX);
+    }
+  }, [slotOffsetX, updateDivider]);
 
   const {
     gameMode,
@@ -20,16 +34,20 @@ export default function GameBoard({ theme }) {
     setAiThinking,
     aiShoot,
     updateTurnTime,
+    hideRopeDuringPlay,
+    isPlayerPlaying,
+    isAIPlaying,
+    setIsPlayerPlaying,
+    setIsAIPlaying,
   } = useGameStore();
 
   const [dragState, setDragState] = useState({
     isDragging: false,
     activePuck: null,
-    ropeAnchor: {
-      x: GAME_CONFIG.PLAYER_ROPE_ANCHOR_X,
-      y: GAME_CONFIG.PLAYER_ROPE_ANCHOR_Y,
-    }, // Fixed rope anchor for player
     dragPosition: null, // Where player is dragging to
+    stretching: false,
+    reboundTime: 0, // For rope wobble animation
+    reboundSide: "player",
   });
 
   const [allowPlayerShoot, setAllowPlayerShoot] = useState(true);
@@ -55,16 +73,34 @@ export default function GameBoard({ theme }) {
       // Update physics
       Matter.Engine.update(engine, GAME_CONFIG.TIME_STEP);
 
-      // Clamp puck velocities
       const bodies = Matter.Composite.allBodies(engine.world);
       bodies.forEach((body) => {
         if (body.label.startsWith("puck")) {
+          // Wrap velocity clamp
           const speed = Math.sqrt(body.velocity.x ** 2 + body.velocity.y ** 2);
           if (speed > GAME_CONFIG.MAX_VELOCITY) {
             Matter.Body.setVelocity(body, {
               x: (body.velocity.x / speed) * GAME_CONFIG.MAX_VELOCITY,
               y: (body.velocity.y / speed) * GAME_CONFIG.MAX_VELOCITY,
             });
+          }
+
+          // ROPE BOUNCE LOGIC (for non-dragged pucks)
+          if (dragState.activePuck !== body) {
+            const { PLAYER_ROPE_Y, AI_ROPE_Y } = GAME_CONFIG;
+            const buffer = 5;
+            
+            // Player side rope bounce
+            if (body.position.y > PLAYER_ROPE_Y - buffer && body.velocity.y > 0) {
+              Matter.Body.setVelocity(body, { x: body.velocity.x, y: -Math.abs(body.velocity.y) * 0.8 });
+              // Simple visual trigger for wobble
+              setDragState(prev => ({ ...prev, reboundTime: Date.now(), reboundSide: "player" }));
+            }
+            // AI side rope bounce
+            if (body.position.y < AI_ROPE_Y + buffer && body.velocity.y < 0) {
+              Matter.Body.setVelocity(body, { x: body.velocity.x, y: Math.abs(body.velocity.y) * 0.8 });
+              setDragState(prev => ({ ...prev, reboundTime: Date.now(), reboundSide: "ai" }));
+            }
           }
         }
       });
@@ -92,7 +128,10 @@ export default function GameBoard({ theme }) {
       }
 
       // Render frame
-      renderer.render(engine, dragState, theme);
+      renderer.render(engine, dragState, theme, { 
+        hideRope: hideRopeDuringPlay && isAIPlaying, 
+        slotOffsetX: slotOffsetRef.current 
+      });
 
       // Update turn timer
       updateTurnTime();
@@ -119,20 +158,23 @@ export default function GameBoard({ theme }) {
     updateTurnTime,
   ]);
 
-  // Pointer down - grab puck and snap to rope anchor
+  // Pointer down - grab puck (any puck in player's territory)
   const handlePointerDown = useCallback(
     (e) => {
       if (!engine || dragState.isDragging) return;
 
       const virtual = screenToVirtual(e.clientX, e.clientY);
+      const isPlayerTerritory = virtual.y > GAME_CONFIG.SLOT_Y;
+      
+      if (!isPlayerTerritory) return;
 
-      // Find closest player 1 puck
+      // Find closest puck (regardless of team)
       const bodies = Matter.Composite.allBodies(engine.world);
       let selectedPuck = null;
       let minDistance = 60;
 
       for (let body of bodies) {
-        if (!body.label.startsWith("puck-p1")) continue;
+        if (!body.label.startsWith("puck")) continue;
 
         const dx = body.position.x - virtual.x;
         const dy = body.position.y - virtual.y;
@@ -144,161 +186,142 @@ export default function GameBoard({ theme }) {
         }
       }
 
-      if (selectedPuck && dragState.ropeAnchor) {
-        // Move puck to rope anchor position
-        const anchorPos = {
-          x: dragState.ropeAnchor.x,
-          y: dragState.ropeAnchor.y,
-        };
+      if (selectedPuck) {
         try {
-          Matter.Body.setPosition(selectedPuck, anchorPos);
           Matter.Body.setVelocity(selectedPuck, { x: 0, y: 0 });
           Matter.Body.setAngularVelocity(selectedPuck, 0);
 
-          setDragState((prev) => ({
-            ...prev,
+          setDragState({
             isDragging: true,
             activePuck: selectedPuck,
-            dragPosition: { x: anchorPos.x, y: anchorPos.y },
-          }));
+            dragPosition: { x: selectedPuck.position.x, y: selectedPuck.position.y },
+            stretching: false,
+          });
         } catch (err) {
-          console.error("Error setting puck position:", err);
+          console.error("Error grabbing puck:", err);
         }
       }
     },
-    [engine, screenToVirtual, dragState.isDragging, dragState.ropeAnchor]
+    [engine, screenToVirtual, dragState.isDragging]
   );
 
-  // Pointer move - show rope pull
+  // Continuous AI Loop
+  useEffect(() => {
+    if (gameMode !== "PVE" || gameState !== "PLAYING") return;
+
+    const interval = setInterval(() => {
+      if (aiControllerRef.current && !aiControllerRef.current.isShooting) {
+        aiControllerRef.current.executeShot(pucks, engine, applyForce, dragState.activePuck?.id)
+          .then((shot) => {
+            if (shot) {
+              setDragState(prev => ({ 
+                ...prev, 
+                reboundTime: Date.now(), 
+                reboundSide: "ai" 
+              }));
+            }
+          })
+          .catch(console.error);
+      }
+    }, 1500); // AI tries to shoot every 1.5s if it can
+
+    return () => clearInterval(interval);
+  }, [gameMode, gameState, pucks, engine, applyForce]);
+
+  // Pointer move - free drag and rope collision check with resistance
   const handlePointerMove = useCallback(
     (e) => {
       if (!dragState.isDragging || !dragState.activePuck) return;
 
       const virtual = screenToVirtual(e.clientX, e.clientY);
+      const puck = dragState.activePuck;
+      const { PLAYER_ROPE_Y, MAX_STRETCH } = GAME_CONFIG;
 
-      // Calculate distance from rope anchor
-      const dx = virtual.x - dragState.ropeAnchor.x;
-      const dy = virtual.y - dragState.ropeAnchor.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      // Clamp to max stretch
       let targetX = virtual.x;
       let targetY = virtual.y;
 
-      if (distance > GAME_CONFIG.MAX_STRETCH) {
-        const angle = Math.atan2(dy, dx);
-        targetX =
-          dragState.ropeAnchor.x + Math.cos(angle) * GAME_CONFIG.MAX_STRETCH;
-        targetY =
-          dragState.ropeAnchor.y + Math.sin(angle) * GAME_CONFIG.MAX_STRETCH;
+      // Handle rope stretching with resistance
+      const isStretching = targetY > PLAYER_ROPE_Y;
+      
+      // RESTRICT DRAGGING: Cannot drag past center line into opponent territory
+      const minPadding = GAME_CONFIG.PUCK_RADIUS + 5;
+      if (targetY < GAME_CONFIG.SLOT_Y + minPadding) {
+        targetY = GAME_CONFIG.SLOT_Y + minPadding;
       }
 
-      // Update puck position and drag position for rope visual
-      if (dragState.activePuck) {
-        try {
-          Matter.Body.setPosition(dragState.activePuck, {
-            x: targetX,
-            y: targetY,
-          });
-          Matter.Body.setVelocity(dragState.activePuck, { x: 0, y: 0 });
-        } catch (err) {
-          console.error("Error updating puck position during drag:", err);
-          // If puck is invalid, stop dragging
-          setDragState((prev) => ({
-            ...prev,
-            isDragging: false,
-            activePuck: null,
-            dragPosition: null,
-          }));
-          return;
-        }
+      if (isStretching) {
+        const rawStretchDist = targetY - PLAYER_ROPE_Y;
+        
+        // Resistance: logarithmic lag
+        // This makes the puck feel like it's pulling against a heavy weight
+        const logResistance = Math.log10(rawStretchDist / 10 + 1) * 120;
+        const clampedStretch = Math.min(logResistance, MAX_STRETCH);
+        targetY = PLAYER_ROPE_Y + clampedStretch;
       }
 
-      // Update drag position for rope visual
-      setDragState((prev) => ({
-        ...prev,
-        dragPosition: { x: targetX, y: targetY },
-      }));
+      try {
+        Matter.Body.setPosition(puck, { x: targetX, y: targetY });
+        Matter.Body.setVelocity(puck, { x: 0, y: 0 });
+        
+        setDragState((prev) => ({
+          ...prev,
+          dragPosition: { x: targetX, y: targetY },
+          stretching: isStretching,
+        }));
+      } catch (err) {
+        console.error("Error updating puck position:", err);
+        setDragState({ isDragging: false, activePuck: null, dragPosition: null, stretching: false });
+      }
     },
     [dragState, screenToVirtual]
   );
 
   // Pointer up - release rope and launch puck
   const handlePointerUp = useCallback(() => {
-    if (
-      !dragState.isDragging ||
-      !dragState.activePuck ||
-      !dragState.dragPosition
-    )
-      return;
+    if (!dragState.isDragging || !dragState.activePuck || !dragState.dragPosition) return;
 
     const puck = dragState.activePuck;
+    const { PLAYER_ROPE_Y, FORCE_MULTIPLIER } = GAME_CONFIG;
 
-    // Verify puck still exists in engine (check both player arrays)
-    const allPucks = [...(pucks.player1 || []), ...(pucks.player2 || [])];
-    if (!allPucks.includes(puck)) {
-      setDragState((prev) => ({
-        ...prev,
-        isDragging: false,
-        activePuck: null,
-        dragPosition: null,
-      }));
+    // Verify puck still exists in engine
+    const bodies = Matter.Composite.allBodies(engine.world);
+    if (!bodies.includes(puck)) {
+      setDragState({ isDragging: false, activePuck: null, dragPosition: null, stretching: false });
       return;
     }
 
-    // Calculate elastic force from rope anchor to current drag position
-    const dx = dragState.ropeAnchor.x - dragState.dragPosition.x;
-    const dy = dragState.ropeAnchor.y - dragState.dragPosition.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    // Launch if it was stretching the rope
+    if (dragState.stretching) {
+      const { x: px, y: py } = dragState.dragPosition;
+      const stretchDistance = py - PLAYER_ROPE_Y;
+      
+      if (stretchDistance > 5) {
+        // Calculate launch vector: from drag position towards the point on the rope
+        // where it was originally attached (x: px, y: PLAYER_ROPE_Y).
+        // Increased horizontal influence for more intuitive angled shots.
+        const dx = (px - puck.position.x) * 0.25; 
+        
+        // Force calculation
+        const forceMagnitude = stretchDistance * FORCE_MULTIPLIER * stretchDistance * 3.0;
+        
+        const force = { 
+          x: -dx * FORCE_MULTIPLIER * stretchDistance * 80, 
+          y: -forceMagnitude 
+        };
 
-    if (distance > 5) {
-      // Apply force proportional to stretch distance (with reduced multiplier)
-      const forceMagnitude = distance * GAME_CONFIG.FORCE_MULTIPLIER;
-      const force = {
-        x: (dx / distance) * forceMagnitude * distance,
-        y: (dy / distance) * forceMagnitude * distance,
-      };
-
-      try {
-        applyForce(puck, force);
-      } catch (err) {
-        console.error("Error applying force to puck:", err);
-      }
-
-      // If PVE mode, trigger AI response (non-blocking)
-      if (
-        gameMode === "PVE" &&
-        aiControllerRef.current &&
-        !aiControllerRef.current.isShooting
-      ) {
-        // AI plays asynchronously without blocking player
-        setTimeout(async () => {
-          try {
-            aiControllerRef.current.isShooting = true;
-            await aiControllerRef.current.executeShot(
-              pucks,
-              engine,
-              applyForce
-            );
-          } catch (error) {
-            console.error("AI shot error:", error);
-          } finally {
-            aiControllerRef.current.isShooting = false;
-          }
-        }, 800); // Faster AI response
+        try {
+          applyForce(puck, force);
+          // Trigger rebound animation
+          setDragState(prev => ({ ...prev, isDragging: false, activePuck: null, dragPosition: null, stretching: false, reboundTime: Date.now(), reboundSide: "player" }));
+          return;
+        } catch (err) {
+          console.error("Error applying force:", err);
+        }
       }
     }
 
-    // Clear drag state immediately - don't wait for AI
-    setDragState((prev) => ({
-      ...prev,
-      isDragging: false,
-      ...prev,
-      isDragging: false,
-      activePuck: null,
-      dragPosition: null,
-    }));
-  }, [dragState, applyForce, gameMode, engine, pucks, setAiThinking]);
+    setDragState({ isDragging: false, activePuck: null, dragPosition: null, stretching: false, reboundTime: 0 });
+  }, [dragState, applyForce, gameMode, engine, pucks]);
 
   // Cancel drag if pointer leaves
   const handlePointerLeave = useCallback(() => {
