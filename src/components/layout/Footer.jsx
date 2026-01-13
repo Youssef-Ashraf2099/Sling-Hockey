@@ -88,17 +88,12 @@ export default function Footer() {
             <h4 className="text-lg font-bold text-white mb-3">
               Play Sling Hockey Online - The Ultimate Tabletop Sport
             </h4>
-            <p className="text-sm text-gray-400 leading-relaxed">
-              Sling Hockey Pro is the premier online platform for playing sling
-              hockey, also known as string hockey or foosball variants.
-              Challenge players worldwide in competitive PVP matches, practice
-              against AI opponents with adjustable difficulty, and climb the
-              global leaderboard. Customize your pucks with premium skins,
-              unlock exclusive board themes, and master the physics-based
-              slingshot mechanic. Free to play with optional upgrades.
-              Compatible with desktop, tablet, and mobile devices. Join
-              thousands of players worldwide and become a Sling Hockey champion
-              today!
+            <p className="text-sm text-gray-400 leading-relaxed font-medium">
+              Sling Hockey Pro is the premier online platform for playing fast-paced tabletop hockey.
+              Dive into the chaos of **Party Mode** with amazing power-ups like Mega Puck, Ghost Puck, and Freeze!
+              Challenge advanced AI opponents across multiple difficulty levels, climb the
+              rankings, and master your slingshot skills. Customize your pucks with premium 
+              skins and unlock exclusive board themes. Play for free on desktop, tablet, or mobile.
             </p>
           </div>
         </div>

@@ -1,77 +1,92 @@
-import { Shield, Zap, Flame } from "lucide-react";
-import { Button } from "../../../shared/components/Button";
+import { Shield, Zap, Flame, Star, TrendingUp } from "lucide-react";
 import { Modal } from "../../../shared/components/Modal";
 
-export default function DifficultySelector({ isOpen, onSelect, gameMode }) {
-  if (gameMode !== "PVE") return null;
-
+export default function DifficultySelector({ isOpen, onSelect, gameMode = "PVE" }) {
   const difficulties = [
     {
       id: "EASY",
-      name: "Easy",
-      description: "AI takes its time and makes mistakes",
+      name: "Training",
+      description: "Passive AI. Best for mastering launch angles.",
+      rewards: { xp: "+50", elo: "+10" },
+      penalty: { xp: "-10", elo: "-5" },
       icon: Shield,
       color: "from-green-500 to-emerald-600",
-      accentColor: "bg-green-600/20 text-green-400",
+      accent: "text-green-400",
+      bg: "bg-green-500/10",
     },
     {
       id: "MEDIUM",
-      name: "Medium",
-      description: "Balanced opponent with moderate skill",
+      name: "Competitive",
+      description: "Aggressive AI. Balanced and challenging.",
+      rewards: { xp: "+100", elo: "+20" },
+      penalty: { xp: "-30", elo: "-15" },
       icon: Zap,
-      color: "from-yellow-500 to-orange-600",
-      accentColor: "bg-yellow-600/20 text-yellow-400",
+      color: "from-blue-500 to-cyan-500",
+      accent: "text-blue-400",
+      bg: "bg-blue-500/10",
     },
     {
       id: "HARD",
-      name: "Hard",
-      description: "AI master - will challenge your skills",
+      name: "Grandmaster",
+      description: "Elite AI. Fast, accurate, and relentless.",
+      rewards: { xp: "+200", elo: "+40" },
+      penalty: { xp: "-60", elo: "-30" },
       icon: Flame,
-      color: "from-red-500 to-red-600",
-      accentColor: "bg-red-600/20 text-red-400",
+      color: "from-purple-500 to-pink-600",
+      accent: "text-pink-400",
+      bg: "bg-pink-500/10",
     },
   ];
 
   return (
-    <Modal isOpen={isOpen} title="Choose AI Difficulty">
+    <Modal isOpen={isOpen} title={`Select ${gameMode === 'PARTY' ? 'Party' : 'Arena'} Difficulty`}>
       <div className="space-y-4">
-        {difficulties.map((difficulty) => {
-          const Icon = difficulty.icon;
+        {difficulties.map((diff) => {
+          const Icon = diff.icon;
           return (
             <button
-              key={difficulty.id}
-              onClick={() => onSelect(difficulty.id)}
-              className="w-full p-4 bg-gray-800 border border-gray-700 rounded-lg hover:border-gray-600 transition-all group"
+              key={diff.id}
+              onClick={() => onSelect(diff.id)}
+              className={`w-full p-5 rounded-2xl border transition-all duration-300 group relative overflow-hidden bg-gray-900 border-gray-800 hover:border-gray-600 hover:shadow-2xl hover:shadow-black/50`}
             >
-              <div className="flex items-start gap-4">
-                <div
-                  className={`bg-gradient-to-br ${difficulty.color} rounded-lg p-3 flex-shrink-0 group-hover:scale-110 transition-transform`}
-                >
-                  <Icon className="w-6 h-6 text-white" />
+              <div className={`absolute inset-0 ${diff.bg} opacity-20 group-hover:opacity-30 transition-opacity`} />
+              
+              <div className="relative z-10 flex items-center gap-5">
+                <div className={`w-14 h-14 bg-gradient-to-br ${diff.color} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                  <Icon className="w-8 h-8 text-white" />
                 </div>
-                <div className="text-left flex-1">
+
+                <div className="flex-1 text-left">
                   <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-bold text-white">{difficulty.name}</h3>
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-semibold ${difficulty.accentColor}`}
-                    >
-                      AI Lvl {difficulties.indexOf(difficulty) + 1}
-                    </span>
+                    <h3 className="text-xl font-extrabold text-white tracking-tight">{diff.name}</h3>
+                    <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                      AI Rank: <span className={diff.accent}>Lvl {difficulties.indexOf(diff) + 1}</span>
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-400">
-                    {difficulty.description}
-                  </p>
+                  <p className="text-sm text-gray-400 font-medium mb-3 line-clamp-1">{diff.description}</p>
+                  
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1.5">
+                      <Star className="w-3 h-3 text-yellow-400" />
+                      <span className="text-xs font-black text-white">{diff.rewards.xp} XP</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <TrendingUp className="w-3 h-3 text-green-400" />
+                      <span className="text-xs font-black text-white">{diff.rewards.elo} ELO</span>
+                    </div>
+                    <div className="ml-auto text-[10px] font-bold text-red-500/60 uppercase">
+                      Risk: {diff.penalty.xp} XP
+                    </div>
+                  </div>
                 </div>
               </div>
             </button>
           );
         })}
 
-        <div className="mt-6 p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
-          <p className="text-sm text-gray-300">
-            💡 <span className="font-semibold">Tip:</span> Start with Easy to
-            learn the mechanics, then challenge yourself with harder
-            difficulties!
+        <div className="mt-6 p-4 bg-gray-900/50 border border-gray-800 rounded-2xl">
+          <p className="text-xs text-center text-gray-500 font-bold leading-relaxed">
+            Higher difficulty increases reward multipliers but also raises the XP penalty for defeat. Master the arena to reach grandmaster status.
           </p>
         </div>
       </div>

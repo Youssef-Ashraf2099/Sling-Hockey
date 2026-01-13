@@ -5,6 +5,7 @@ import { usePhysicsEngine } from "../hooks/usePhysicsEngine";
 import { useSlotAnimation } from "../../../core/physics/useSlotAnimation";
 import { RenderSystem } from "../physics/RenderSystem";
 import { AIController } from "../physics/AIController";
+import { usePowerUps } from "../hooks/usePowerUps";
 import { GAME_CONFIG } from "../../../core/config/gameConstants";
 import { useGameStore } from "../store/gameStore";
 import { soundManager } from "../../../core/audio/SoundManager";
@@ -12,12 +13,15 @@ import { soundManager } from "../../../core/audio/SoundManager";
 export default function GameBoard({ theme }) {
   const { canvasRef, containerRef, dimensions, scale, screenToVirtual } =
     useResponsiveCanvas();
-  const { engine, pucks, getPuckAtPosition, applyForce, checkSlotScoring, updateDivider, resetPucks } =
+  const { engine, pucks, getPuckAtPosition, applyForce, checkSlotScoring, updateDivider, resetPucks, spawnPowerUp, scaleBody, setGhostMode } =
     usePhysicsEngine();
   
-  const { gameState } = useGameStore();
+  const { gameState, activePowerUps } = useGameStore();
   const isGameActive = gameState === "PLAYING";
-  const { playerSlotX, aiSlotX, slotOffsetX, isMoving } = useSlotAnimation(isGameActive);
+  const { playerSlotX, aiSlotX, slotOffsetX, isMoving } = useSlotAnimation(isGameActive, activePowerUps.slotFrozen);
+  
+  // Power-up spawning system
+  usePowerUps(engine?.world, spawnPowerUp, scaleBody, setGhostMode);
   const slotOffsetRef = useRef(0);
   
   // Sync physics divider with slot animation
@@ -64,7 +68,7 @@ export default function GameBoard({ theme }) {
 
   // Initialize AI controller
   useEffect(() => {
-    if (gameMode === "PVE" && difficulty) {
+    if ((gameMode === "PVE" || gameMode === "PARTY") && difficulty) {
       aiControllerRef.current = new AIController(difficulty);
     }
   }, [gameMode, difficulty]);
@@ -138,7 +142,8 @@ export default function GameBoard({ theme }) {
       // Render frame
       renderer.render(engine, dragState, theme, { 
         hideRope: hideRopeDuringPlay && isAIPlaying, 
-        slotOffsetX: slotOffsetRef.current 
+        slotOffsetX: slotOffsetRef.current,
+        activePowerUps
       });
 
       // Update turn timer
@@ -170,6 +175,7 @@ export default function GameBoard({ theme }) {
   const handlePointerDown = useCallback(
     (e) => {
       if (!engine || dragState.isDragging) return;
+      if (activePowerUps.playerFrozen) return;
 
       const virtual = screenToVirtual(e.clientX, e.clientY);
       const isPlayerTerritory = virtual.y > GAME_CONFIG.SLOT_Y;
@@ -215,9 +221,13 @@ export default function GameBoard({ theme }) {
 
   // Continuous AI Loop
   useEffect(() => {
-    if (gameMode !== "PVE" || gameState !== "PLAYING") return;
+    if (gameMode !== "PVE" && gameMode !== "PARTY") return;
+    if (gameState !== "PLAYING") return;
 
     const interval = setInterval(() => {
+      // AI stops shooting if frozen powerup is active
+      if (activePowerUps.slotFrozen) return;
+
       if (aiControllerRef.current && !aiControllerRef.current.isShooting) {
         aiControllerRef.current.executeShot(pucks, engine, applyForce, dragState.activePuck?.id)
           .then((shot) => {
@@ -234,7 +244,7 @@ export default function GameBoard({ theme }) {
     }, 1500); // AI tries to shoot every 1.5s if it can
 
     return () => clearInterval(interval);
-  }, [gameMode, gameState, pucks, engine, applyForce]);
+  }, [gameMode, gameState, pucks, engine, applyForce, activePowerUps.slotFrozen]);
 
   // Pointer move - free drag and rope collision check with resistance
   const handlePointerMove = useCallback(

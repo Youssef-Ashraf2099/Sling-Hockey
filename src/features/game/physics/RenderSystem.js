@@ -19,6 +19,7 @@ export class RenderSystem {
 
     this.frame++;
     this.slotOffsetX = slotOffsetX; // Store for use in drawSlotMarkers
+    this.activePowerUps = options.activePowerUps || {}; // Store for visuals
 
     // Clear and draw background
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
@@ -48,6 +49,9 @@ export class RenderSystem {
 
     // Draw all pucks
     this.drawPucks(engine);
+
+    // Draw power-ups
+    this.drawPowerUps(engine);
 
     // Draw slot markers with animation
     this.drawSlotMarkers(ctx);
@@ -217,14 +221,25 @@ export class RenderSystem {
 
       const x = body.position.x * scale.x;
       const y = body.position.y * scale.y;
-      const r = GAME_CONFIG.PUCK_RADIUS * scale.x;
+      const baseR = GAME_CONFIG.PUCK_RADIUS;
+      const rScale = body.customData?.scale || 1;
+      const r = baseR * rScale * scale.x;
+      const isGhost = body.customData?.isGhost || false;
 
       const skinId = body.customData?.skinId;
       const isSport = ["basketball", "football", "volleyball"].includes(skinId);
 
+      ctx.save();
+      if (isGhost) {
+        ctx.globalAlpha = 0.5;
+        // Add a blue-ish ghost glow
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = "cyan";
+      }
+
       // Only draw background circle and outline if NOT a sport skin
       if (!isSport) {
-        // Shadow
+        // Shadow (pucks have a slight shadow)
         ctx.beginPath();
         ctx.arc(x + 2, y + 2, r, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
@@ -237,7 +252,7 @@ export class RenderSystem {
         ctx.fill();
 
         // Puck outline
-        ctx.strokeStyle = "#000000";
+        ctx.strokeStyle = isGhost ? "cyan" : "#000000";
         ctx.lineWidth = 2;
         ctx.stroke();
       }
@@ -287,6 +302,38 @@ export class RenderSystem {
           ctx.fillText("AI", x, y);
         }
       }
+      ctx.restore();
+    });
+  }
+
+  drawPowerUps(engine) {
+    const ctx = this.ctx;
+    const { scale } = this;
+    const bodies = Matter.Composite.allBodies(engine.world);
+
+    bodies.forEach((body) => {
+      if (body.label !== "powerup") return;
+
+      const x = body.position.x * scale.x;
+      const y = body.position.y * scale.y;
+      const type = body.customData?.type;
+
+      const icons = {
+        MEGA: "🍄",
+        GHOST: "👻",
+        FREEZE: "❄️",
+      };
+
+      // Draw floating glow
+      const pulse = Math.sin(this.frame * 0.1) * 5;
+      ctx.save();
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = "white";
+      ctx.font = `${30 * scale.x + pulse}px Inter`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(icons[type] || "⭐", x, y + pulse);
+      ctx.restore();
     });
   }
 
@@ -294,24 +341,42 @@ export class RenderSystem {
     const { scale } = this;
     const { VIRTUAL_WIDTH, SLOT_Y, SLOT_WIDTH } = GAME_CONFIG;
     const slotOffsetX = this.slotOffsetX || 0;
-
+    
     // Apply slot offset for moving animation
     const slotLeftX = (VIRTUAL_WIDTH - SLOT_WIDTH) / 2 + slotOffsetX;
-    const slotRightX = (VIRTUAL_WIDTH + SLOT_WIDTH) / 2 + slotOffsetX;
     const slotCenterX = (VIRTUAL_WIDTH / 2) + slotOffsetX;
     const slotY = SLOT_Y;
+    const isFrozen = this.activePowerUps?.slotFrozen;
 
     // Draw slot markers with offset
-    ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-    ctx.font = "14px Inter";
+    ctx.save();
+    if (isFrozen) {
+      ctx.fillStyle = "#A5F3FC"; // Ice blue
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = "cyan";
+      ctx.font = "black 18px Inter";
+    } else {
+      ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+      ctx.font = "14px Inter";
+    }
+    
     ctx.textAlign = "center";
-    ctx.fillText("⬇", slotCenterX * scale.x, (slotY - 30) * scale.y);
-    ctx.fillText("⬆", slotCenterX * scale.x, (slotY + 40) * scale.y);
+    ctx.fillText(isFrozen ? "❄️ FROZEN ❄️" : "⬇", slotCenterX * scale.x, (slotY - 30) * scale.y);
+    ctx.fillText(isFrozen ? "❄️ FROZEN ❄️" : "⬆", slotCenterX * scale.x, (slotY + 40) * scale.y);
+    ctx.restore();
 
     // Draw slot boundary (highlight moving slot)
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
-    ctx.lineWidth = 2;
+    ctx.save();
     ctx.setLineDash([4, 4]);
+    if (isFrozen) {
+      ctx.strokeStyle = "rgba(34, 211, 238, 0.8)";
+      ctx.lineWidth = 4;
+      ctx.setLineDash([]); // No dashes for ice block
+    } else {
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+      ctx.lineWidth = 2;
+    }
+
     ctx.strokeRect(
       slotLeftX * scale.x,
       (slotY - 40) * scale.y,
@@ -319,5 +384,6 @@ export class RenderSystem {
       80 * scale.y
     );
     ctx.setLineDash([]); // Reset line dash
+    ctx.restore();
   }
 }

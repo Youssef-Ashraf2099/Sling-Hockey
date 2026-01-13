@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, ChevronLeft, ChevronRight, Target, Zap, Shield } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Target, Zap, Shield, PartyPopper } from "lucide-react";
 import { Button } from "../../../shared/components/Button";
 
 const tutorialSlides = [
@@ -20,6 +20,12 @@ const tutorialSlides = [
     description: "You can grab ANY puck that enters your half. Watch out for the moving slot and remember to win the game make all the balls to the oponents other side",
     image: "/assets/tutorial/dynamic_slot.png",
     icon: <Shield className="w-6 h-6 text-purple-400" />,
+  },
+  {
+    title: "Party Mode: Power Ups",
+    description: "In Party Mode, look for floating icons! 🍄 (Mega) makes you huge, 👻 (Ghost) lets you pass through walls, and ❄️ (Freeze) stops the board.",
+    image: "/assets/tutorial/initial_layout.png",
+    icon: <PartyPopper className="w-6 h-6 text-pink-400" />,
   },
 ];
 

@@ -9,7 +9,7 @@ import {
  * @param {boolean} isGameActive - Whether game is currently playing
  * @returns {Object} { playerSlotX, aiSlotX, isMoving }
  */
-export function useSlotAnimation(isGameActive) {
+export function useSlotAnimation(isGameActive, isFrozen = false) {
   const [slotOffsetX, setSlotOffsetX] = useState(0);
   const [isMoving, setIsMoving] = useState(false);
   const animationStartTimeRef = useRef(null);
@@ -25,12 +25,14 @@ export function useSlotAnimation(isGameActive) {
   const aiSlotX = BOARD_CENTER_X - SLOT_WIDTH / 2 + slotOffsetX;
 
   useEffect(() => {
-    if (!isGameActive || !ENABLE_MOVING_SLOT) {
+    if (!isGameActive || !ENABLE_MOVING_SLOT || isFrozen) {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
-      setSlotOffsetX(0);
-      setIsMoving(false);
+      if (!isFrozen) {
+        setSlotOffsetX(0);
+        setIsMoving(false);
+      }
       return;
     }
 

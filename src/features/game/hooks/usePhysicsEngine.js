@@ -41,11 +41,25 @@ export function usePhysicsEngine() {
     const runner = Matter.Runner.create();
     Matter.Runner.run(runner, engine);
 
-    // Collision Events for Audio
+    // Collision Events for Audio and Power-ups
     const handleCollision = (event) => {
       event.pairs.forEach((pair) => {
         const { bodyA, bodyB } = pair;
         
+        // Power-up collection
+        if (bodyA.label === "powerup" || bodyB.label === "powerup") {
+          const powerup = bodyA.label === "powerup" ? bodyA : bodyB;
+          const puck = bodyA.label === "powerup" ? bodyB : bodyA;
+          
+          if (puck.label.startsWith("puck")) {
+            // Trigger collection callback (to be handled by game loop)
+            if (powerup.customData?.onCollect) {
+              powerup.customData.onCollect(puck);
+            }
+          }
+          return; // Don't play collision sound for sensor hits
+        }
+
         // Only care about puck collisions
         if (bodyA.label.startsWith("puck") || bodyB.label.startsWith("puck")) {
           // Calculate relative velocity for impact intensity
@@ -136,6 +150,7 @@ export function usePhysicsEngine() {
           label: "wall-right",
           restitution: WALL_RESTITUTION,
           friction: WALL_FRICTION,
+          collisionFilter: { category: COLLISION_CATEGORIES.WALL },
           render: { fillStyle: COLORS.WOOD_FRAME },
         }
       ),
@@ -171,6 +186,7 @@ export function usePhysicsEngine() {
         label: "divider-left",
         restitution: DIVIDER_RESTITUTION,
         friction: DIVIDER_FRICTION,
+        collisionFilter: { category: COLLISION_CATEGORIES.DIVIDER },
         render: { fillStyle: COLORS.DIVIDER },
       }
     );
@@ -186,6 +202,7 @@ export function usePhysicsEngine() {
         label: "divider-right",
         restitution: DIVIDER_RESTITUTION,
         friction: DIVIDER_FRICTION,
+        collisionFilter: { category: COLLISION_CATEGORIES.DIVIDER },
         render: { fillStyle: COLORS.DIVIDER },
       }
     );
@@ -200,6 +217,7 @@ export function usePhysicsEngine() {
         label: "corner-left",
         restitution: 0.8,
         friction: 0.05,
+        collisionFilter: { category: COLLISION_CATEGORIES.DIVIDER },
         render: { fillStyle: COLORS.DIVIDER },
       }
     );
@@ -213,6 +231,7 @@ export function usePhysicsEngine() {
         label: "corner-right",
         restitution: 0.8,
         friction: 0.05,
+        collisionFilter: { category: COLLISION_CATEGORIES.DIVIDER },
         render: { fillStyle: COLORS.DIVIDER },
       }
     );
@@ -276,6 +295,10 @@ export function usePhysicsEngine() {
           skinId: skinData.id,
           index,
         },
+        collisionFilter: {
+          category: COLLISION_CATEGORIES.PUCK,
+          mask: COLLISION_CATEGORIES.PUCK | COLLISION_CATEGORIES.WALL | COLLISION_CATEGORIES.DIVIDER,
+        }
       });
 
       pucksRef.current.player1.push(puck);
@@ -303,6 +326,10 @@ export function usePhysicsEngine() {
           skinId: skinData.id,
           index,
         },
+        collisionFilter: {
+          category: COLLISION_CATEGORIES.PUCK,
+          mask: COLLISION_CATEGORIES.PUCK | COLLISION_CATEGORIES.WALL | COLLISION_CATEGORIES.DIVIDER,
+        }
       });
 
       pucksRef.current.player2.push(puck);
@@ -372,6 +399,41 @@ export function usePhysicsEngine() {
     createPucks(worldRef.current);
   }, [getCurrentSkinData]);
 
+  const spawnPowerUp = useCallback((x, y, type, onCollect) => {
+    if (!worldRef.current) return null;
+    
+    const powerup = Matter.Bodies.circle(x, y, 25, {
+      isStatic: true,
+      isSensor: true,
+      label: "powerup",
+      customData: { type, onCollect },
+      render: { opacity: 0 } // Rendered by RenderSystem
+    });
+    
+    Matter.Composite.add(worldRef.current, powerup);
+    return powerup;
+  }, []);
+
+  const scaleBody = useCallback((body, scale) => {
+    if (!body) return;
+    Matter.Body.scale(body, scale, scale);
+    // Update visual radius in customData if it exists
+    if (body.customData) {
+      body.customData.scale = (body.customData.scale || 1) * scale;
+    }
+  }, []);
+
+  const setGhostMode = useCallback((body, isGhost) => {
+    if (!body) return;
+    body.collisionFilter.mask = isGhost 
+      ? COLLISION_CATEGORIES.WALL | COLLISION_CATEGORIES.PUCK // Pass through dividers
+      : COLLISION_CATEGORIES.PUCK | COLLISION_CATEGORIES.WALL | COLLISION_CATEGORIES.DIVIDER;
+    
+    if (body.customData) {
+      body.customData.isGhost = isGhost;
+    }
+  }, []);
+
   return {
     engine: engineRef.current,
     world: worldRef.current,
@@ -381,5 +443,8 @@ export function usePhysicsEngine() {
     checkSlotScoring,
     resetPucks,
     updateDivider,
+    spawnPowerUp,
+    scaleBody,
+    setGhostMode,
   };
 }
