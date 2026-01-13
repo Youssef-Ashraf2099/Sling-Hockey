@@ -8,7 +8,7 @@ export const GAME_CONFIG = {
   TIME_STEP: 1000 / 60,
 
   // Puck properties (scaled up)
-  PUCK_RADIUS: 30,
+  PUCK_RADIUS: 40,
   PUCK_COUNT: 10, // 5 per player
 
   // Elastic band (Slingshot style) - FORCE REDUCED TO FIX COLLISIONS

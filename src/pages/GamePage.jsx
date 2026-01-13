@@ -333,7 +333,11 @@ export default function GamePage() {
               <Button
                 variant="primary"
                 className="flex-1"
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  resetGame();
+                  // Forcing a small delay or navigation if needed, 
+                  // but resetGame() setting state to HOME will trigger the start useEffect
+                }}
               >
                 Play Again
               </Button>

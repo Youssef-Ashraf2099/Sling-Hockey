@@ -7,11 +7,12 @@ import { RenderSystem } from "../physics/RenderSystem";
 import { AIController } from "../physics/AIController";
 import { GAME_CONFIG } from "../../../core/config/gameConstants";
 import { useGameStore } from "../store/gameStore";
+import { soundManager } from "../../../core/audio/SoundManager";
 
 export default function GameBoard({ theme }) {
   const { canvasRef, containerRef, dimensions, scale, screenToVirtual } =
     useResponsiveCanvas();
-  const { engine, pucks, getPuckAtPosition, applyForce, checkSlotScoring, updateDivider } =
+  const { engine, pucks, getPuckAtPosition, applyForce, checkSlotScoring, updateDivider, resetPucks } =
     usePhysicsEngine();
   
   const { gameState } = useGameStore();
@@ -32,7 +33,6 @@ export default function GameBoard({ theme }) {
     difficulty,
     scorePoint,
     setAiThinking,
-    aiShoot,
     updateTurnTime,
     hideRopeDuringPlay,
     isPlayerPlaying,
@@ -53,6 +53,14 @@ export default function GameBoard({ theme }) {
   const [allowPlayerShoot, setAllowPlayerShoot] = useState(true);
   const aiControllerRef = useRef(null);
   const winDetectedRef = useRef(false); // Prevent infinite loop on win
+
+  // Watch for game start to reset board
+  useEffect(() => {
+    if (gameState === "PLAYING") {
+      winDetectedRef.current = false;
+      if (resetPucks) resetPucks();
+    }
+  }, [gameState, resetPucks]);
 
   // Initialize AI controller
   useEffect(() => {
@@ -311,6 +319,10 @@ export default function GameBoard({ theme }) {
 
         try {
           applyForce(puck, force);
+          
+          // Sound effect
+          soundManager.playLaunch(stretchDistance / 100);
+
           // Trigger rebound animation
           setDragState(prev => ({ ...prev, isDragging: false, activePuck: null, dragPosition: null, stretching: false, reboundTime: Date.now(), reboundSide: "player" }));
           return;

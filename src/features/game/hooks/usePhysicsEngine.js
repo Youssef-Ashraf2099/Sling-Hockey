@@ -6,6 +6,7 @@ import {
   COLLISION_CATEGORIES,
 } from "../../../core/config/gameConstants";
 import { useShopStore } from "../../shop/store/shopStore";
+import { soundManager } from "../../../core/audio/SoundManager";
 
 export function usePhysicsEngine() {
   const engineRef = useRef(null);
@@ -40,8 +41,31 @@ export function usePhysicsEngine() {
     const runner = Matter.Runner.create();
     Matter.Runner.run(runner, engine);
 
+    // Collision Events for Audio
+    const handleCollision = (event) => {
+      event.pairs.forEach((pair) => {
+        const { bodyA, bodyB } = pair;
+        
+        // Only care about puck collisions
+        if (bodyA.label.startsWith("puck") || bodyB.label.startsWith("puck")) {
+          // Calculate relative velocity for impact intensity
+          const relVel = {
+            x: bodyA.velocity.x - bodyB.velocity.x,
+            y: bodyA.velocity.y - bodyB.velocity.y
+          };
+          const speed = Math.sqrt(relVel.x ** 2 + relVel.y ** 2);
+          
+          // Play collision sound scaled by impact
+          soundManager.playCollision(speed / 10);
+        }
+      });
+    };
+
+    Matter.Events.on(engine, "collisionStart", handleCollision);
+
     // Cleanup
     return () => {
+      Matter.Events.off(engine, "collisionStart", handleCollision);
       Matter.Runner.stop(runner);
       Matter.Engine.clear(engine);
       Matter.World.clear(engine.world);

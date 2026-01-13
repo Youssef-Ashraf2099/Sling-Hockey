@@ -11,6 +11,7 @@ import {
   Zap,
   Package
 } from "lucide-react";
+import { soundManager } from "../core/audio/SoundManager";
 import { Button } from "../shared/components/Button";
 import { Card } from "../shared/components/Card";
 import { useShopStore, PUCK_SKINS, BOARD_THEMES } from "../features/shop/store/shopStore";
@@ -35,7 +36,10 @@ export default function ShopPage() {
   const handleWatchAd = async (itemId, type) => {
     setIsWatchingAd(true);
     setAdTarget(itemId);
-    await unlockWithAd(itemId, type);
+    const success = await unlockWithAd(itemId, type);
+    if (success) {
+      soundManager.playGoal();
+    }
     setIsWatchingAd(false);
     setAdTarget(null);
   };
@@ -49,45 +53,52 @@ export default function ShopPage() {
       ? currentSkin === item.id 
       : currentTheme === item.id;
 
+    const handleEquip = (itemId, type) => {
+      soundManager.playEquip();
+      if (type === "puck") equipSkin(itemId);
+      else equipTheme(itemId);
+    };
+
     return (
       <Card key={item.id} className={`relative overflow-hidden group transition-all duration-300 hover:shadow-2xl ${isEquipped ? 'ring-2 ring-blue-500 bg-blue-500/5' : 'hover:bg-gray-800/50'}`}>
         <div className="p-4 flex flex-col h-full">
           {/* Preview Area */}
           <div 
-            className="h-32 rounded-lg mb-4 flex items-center justify-center border border-gray-700/50 shadow-inner group-hover:scale-105 transition-transform overflow-hidden relative"
+            className="h-40 rounded-lg mb-4 flex items-center justify-center border border-gray-700/50 shadow-inner group-hover:scale-105 transition-transform overflow-hidden relative"
             style={{ 
-              backgroundColor: type === "board" ? item.backgroundColor : "#0f172a",
+              backgroundColor: type === "board" ? item.backgroundColor : "#020617",
               borderColor: type === "board" ? item.dividerColor : "rgba(55, 65, 81, 0.5)"
             }}
           >
             {type === "puck" ? (
-              <div className="relative">
+              <div className="relative flex items-center justify-center">
                 {/* Glow Effect */}
                 <div 
-                  className="absolute inset-0 blur-xl opacity-50 rounded-full animate-pulse"
+                  className="absolute inset-0 blur-2xl opacity-40 rounded-full animate-pulse scale-150"
                   style={{ backgroundColor: item.color }}
                 />
-                <div 
-                  className="w-16 h-16 rounded-full shadow-2xl relative flex items-center justify-center border-2 border-black/20 overflow-hidden"
-                  style={{ 
-                   background: `radial-gradient(circle at 30% 30%, ${item.color}, #000)`,
-                   boxShadow: `inset -4px -4px 8px rgba(0,0,0,0.5), 0 10px 20px rgba(0,0,0,0.3)`
-                  }}
-                >
-                  {/* Highlight */}
-                  <div className="absolute top-2 left-2 w-4 h-4 bg-white/30 rounded-full blur-[1px]" />
-                  
-                  {/* Sport Specific Patterns */}
-                  {item.id === "basketball" && (
-                    <div className="opacity-40 pointer-events-none scale-150">🏀</div>
-                  )}
-                  {item.id === "football" && (
-                    <div className="opacity-40 pointer-events-none scale-150">🏈</div>
-                  )}
-                  {item.id === "volleyball" && (
-                    <div className="opacity-40 pointer-events-none scale-150">🏐</div>
-                  )}
-                </div>
+                
+                {["basketball", "football", "volleyball"].includes(item.id) ? (
+                   // Sport Skins: No background, just large icon
+                   <div className="text-7xl relative z-10 drop-shadow-2xl filter saturate-125">
+                     {item.id === "basketball" && "🏀"}
+                     {item.id === "football" && "🏈"}
+                     {item.id === "volleyball" && "🏐"}
+                   </div>
+                ) : (
+                  // Normal skins: High quality sphere
+                  <div 
+                    className="w-24 h-24 rounded-full shadow-2xl relative flex items-center justify-center border-2 border-white/10 overflow-hidden z-10"
+                    style={{ 
+                     background: `radial-gradient(circle at 30% 30%, ${item.color}, #000)`,
+                     boxShadow: `inset -8px -8px 16px rgba(0,0,0,0.6), 0 15px 30px rgba(0,0,0,0.4)`
+                    }}
+                  >
+                    <div className="absolute top-4 left-4 w-8 h-8 bg-white/40 rounded-full blur-[2px]" />
+                    {item.id === "gold" && <div className="text-3xl">✨</div>}
+                  </div>
+                )
+                }
               </div>
             ) : (
               <div className="w-full h-full flex flex-col p-4 relative">
@@ -124,7 +135,7 @@ export default function ShopPage() {
                 variant={isEquipped ? "secondary" : "primary"}
                 className="w-full"
                 size="sm"
-                onClick={() => type === "puck" ? equipSkin(item.id) : equipTheme(item.id)}
+                onClick={() => handleEquip(item.id, type)}
                 disabled={isEquipped}
               >
                 {isEquipped ? "Equipped" : "Equip"}

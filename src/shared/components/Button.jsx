@@ -1,3 +1,5 @@
+import { soundManager } from "../../core/audio/SoundManager";
+
 export function Button({
   children,
   variant = "primary",
@@ -30,7 +32,10 @@ export function Button({
     <button
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
       disabled={disabled}
-      onClick={onClick}
+      onClick={(e) => {
+        soundManager.playClick();
+        onClick?.(e);
+      }}
       {...props}
     >
       {children}

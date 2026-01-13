@@ -219,47 +219,65 @@ export class RenderSystem {
       const y = body.position.y * scale.y;
       const r = GAME_CONFIG.PUCK_RADIUS * scale.x;
 
-      // Shadow
-      ctx.beginPath();
-      ctx.arc(x + 2, y + 2, r, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
-      ctx.fill();
+      const skinId = body.customData?.skinId;
+      const isSport = ["basketball", "football", "volleyball"].includes(skinId);
 
-      // Puck body
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fillStyle = body.render.fillStyle || "#ffffff";
-      ctx.fill();
+      // Only draw background circle and outline if NOT a sport skin
+      if (!isSport) {
+        // Shadow
+        ctx.beginPath();
+        ctx.arc(x + 2, y + 2, r, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.25)";
+        ctx.fill();
 
-      // Puck outline
-      ctx.strokeStyle = "#000000";
-      ctx.lineWidth = 2;
-      ctx.stroke();
+        // Puck body
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = body.render.fillStyle || "#ffffff";
+        ctx.fill();
 
-      // Optional: draw team indicator or sport icon
+        // Puck outline
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // Draw icons or team indicators
       if (body.customData) {
-        if (body.customData.team === "player") {
-          // If it's a sports puck, draw the icon
-          const skinId = body.customData.skinId;
-          const icons = {
-            basketball: "🏀",
-            football: "🏈",
-            volleyball: "🏐",
-            gold: "✨",
-          };
+        const icons = {
+          basketball: "🏀",
+          football: "🏈",
+          volleyball: "🏐",
+          gold: "✨",
+        };
+        
+        if (icons[skinId]) {
+          // Draw icon larger to fill the shape
+          const fontSize = isSport ? r * 2.2 : r;
+          ctx.font = `${fontSize}px Inter`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
           
-          if (icons[skinId]) {
-            ctx.font = `${r}px Inter`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(icons[skinId], x, y);
-          } else {
-            // Default player highlight
-            ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-            ctx.beginPath();
-            ctx.arc(x, y, r * 0.4, 0, Math.PI * 2);
-            ctx.fill();
+          // Draw a subtle shadow for sports emojis to make them pop
+          if (isSport) {
+            ctx.shadowColor = "rgba(0,0,0,0.5)";
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
           }
+          
+          ctx.fillText(icons[skinId], x, y);
+          
+          // Reset shadow
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+        } else if (body.customData.team === "player") {
+          // Default player highlight
+          ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+          ctx.beginPath();
+          ctx.arc(x, y, r * 0.4, 0, Math.PI * 2);
+          ctx.fill();
         } else {
           // Opponent indicator
           ctx.font = `${r * 0.8}px Inter`;
