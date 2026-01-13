@@ -244,11 +244,11 @@ export function usePhysicsEngine() {
         inertia: Infinity, // No rotation
         slop: 0.05,
         render: {
-          fillStyle: PLAYER_POSITIONS.PLAYER_1.color,
+          fillStyle: skinData.color, // Fixed: use skin color
         },
         customData: {
           player: 1,
-          team: "white",
+          team: "player",
           skinId: skinData.id,
           index,
         },
@@ -262,20 +262,21 @@ export function usePhysicsEngine() {
     PLAYER_POSITIONS.PLAYER_2.pucks.forEach((pos, index) => {
       const puck = Matter.Bodies.circle(pos.x, pos.y, PUCK_RADIUS, {
         label: `puck-p2-${index}`,
-        restitution: GAME_CONFIG.PUCK_RESTITUTION,
-        friction: GAME_CONFIG.PUCK_FRICTION,
-        frictionAir: GAME_CONFIG.PUCK_FRICTION_AIR,
+        restitution: skinData.physics.restitution, // Give AI same physics for fairness
+        friction: skinData.physics.friction,
+        frictionAir: skinData.physics.frictionAir,
         frictionStatic: GAME_CONFIG.PUCK_FRICTION_STATIC,
         density: GAME_CONFIG.PUCK_DENSITY,
+        mass: skinData.physics.mass,
         inertia: Infinity,
         slop: 0.05,
         render: {
-          fillStyle: PLAYER_POSITIONS.PLAYER_2.color,
+          fillStyle: "#ef4444", // Give AI a distinct "opponent" color (red)
         },
         customData: {
           player: 2,
-          team: "black",
-          skinId: "classic",
+          team: "opponent",
+          skinId: skinData.id,
           index,
         },
       });

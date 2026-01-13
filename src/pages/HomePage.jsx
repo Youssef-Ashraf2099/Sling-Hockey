@@ -247,11 +247,6 @@ export default function HomePage() {
         onClose={() => setIsTutorialOpen(false)} 
       />
       
-      <TutorialModal 
-        isOpen={isTutorialOpen} 
-        onClose={() => setIsTutorialOpen(false)} 
-      />
-      
       {/* Footer */}
       <Footer />
     </div>

@@ -236,12 +236,38 @@ export class RenderSystem {
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Optional: draw team indicator
+      // Optional: draw team indicator or sport icon
       if (body.customData) {
-        ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
-        ctx.beginPath();
-        ctx.arc(x, y, r * 0.4, 0, Math.PI * 2);
-        ctx.fill();
+        if (body.customData.team === "player") {
+          // If it's a sports puck, draw the icon
+          const skinId = body.customData.skinId;
+          const icons = {
+            basketball: "🏀",
+            football: "🏈",
+            volleyball: "🏐",
+            gold: "✨",
+          };
+          
+          if (icons[skinId]) {
+            ctx.font = `${r}px Inter`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(icons[skinId], x, y);
+          } else {
+            // Default player highlight
+            ctx.fillStyle = "rgba(255, 255, 255, 0.3)";
+            ctx.beginPath();
+            ctx.arc(x, y, r * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else {
+          // Opponent indicator
+          ctx.font = `${r * 0.8}px Inter`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "white";
+          ctx.fillText("AI", x, y);
+        }
       }
     });
   }
