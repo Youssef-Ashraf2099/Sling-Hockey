@@ -304,52 +304,28 @@ export function usePhysicsEngine() {
 
   const checkSlotScoring = useCallback(() => {
     if (!worldRef.current) return [];
-    // Legacy function - now checks territory-based win condition
-    const { SLOT_Y, VIRTUAL_HEIGHT } = GAME_CONFIG;
+    
+    const { SLOT_Y } = GAME_CONFIG;
     const bodies = Matter.Composite.allBodies(worldRef.current);
+    const pucks = bodies.filter((body) => body.label.startsWith("puck"));
+    const totalPucks = pucks.length;
 
-    // Count balls on each side
-    let player1BallsOnAISide = 0; // White balls on top (AI territory)
-    let player2BallsOnPlayerSide = 0; // Black balls on bottom (Player territory)
+    if (totalPucks === 0) return [];
 
-    let totalPlayer1Balls = 0;
-    let totalPlayer2Balls = 0;
+    // Count pucks on each side
+    const pucksOnTop = pucks.filter((p) => p.position.y < SLOT_Y).length;
+    const pucksOnBottom = pucks.filter((p) => p.position.y > SLOT_Y).length;
 
-    bodies.forEach((body) => {
-      if (!body.label.startsWith("puck")) return;
-
-      const isPlayer1Ball = body.label.startsWith("puck-p1");
-      const isPlayer2Ball = body.label.startsWith("puck-p2");
-
-      if (isPlayer1Ball) {
-        totalPlayer1Balls++;
-        // Check if white ball is on AI side (top half, y < center)
-        if (body.position.y < SLOT_Y) {
-          player1BallsOnAISide++;
-        }
-      } else if (isPlayer2Ball) {
-        totalPlayer2Balls++;
-        // Check if black ball is on Player side (bottom half, y > center)
-        if (body.position.y > SLOT_Y) {
-          player2BallsOnPlayerSide++;
-        }
-      }
-    });
-
-    // Check win conditions: all balls on opponent side
     const scored = [];
 
-    // Player 1 (white) wins if all their balls are on AI side (top)
-    if (totalPlayer1Balls > 0 && player1BallsOnAISide === totalPlayer1Balls) {
-      scored.push({ player: 1, ballsOnOpponentSide: player1BallsOnAISide });
+    // Player 1 (Bottom/White) wins if ALL pucks are on AI side (top)
+    if (pucksOnTop === totalPucks) {
+      scored.push({ player: 1, ballsOnOpponentSide: totalPucks });
     }
 
-    // Player 2 (AI/black) wins if all their balls are on Player side (bottom)
-    if (
-      totalPlayer2Balls > 0 &&
-      player2BallsOnPlayerSide === totalPlayer2Balls
-    ) {
-      scored.push({ player: 2, ballsOnOpponentSide: player2BallsOnPlayerSide });
+    // Player 2 (Top/Black/AI) wins if ALL pucks are on Player side (bottom)
+    if (pucksOnBottom === totalPucks) {
+      scored.push({ player: 2, ballsOnOpponentSide: totalPucks });
     }
 
     return scored;

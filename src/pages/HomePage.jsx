@@ -5,9 +5,13 @@ import { Card } from "../shared/components/Card";
 import { useGameStore } from "../features/game/store/gameStore";
 import { useShopStore } from "../features/shop/store/shopStore";
 import Footer from "../components/layout/Footer";
+import { TutorialModal } from "../features/game/components/TutorialModal";
+import { Info } from "lucide-react";
+import { useState } from "react";
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const { gamesPlayed, gamesWon, playerELO, currentStreak } = useGameStore();
   const { isPro } = useShopStore();
 
@@ -38,6 +42,15 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-4">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="hidden md:flex items-center gap-2"
+              onClick={() => setIsTutorialOpen(true)}
+            >
+              <Info className="w-4 h-4" />
+              How to Play
+            </Button>
             {isPro && (
               <div className="px-3 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full text-sm font-bold text-white">
                 PRO
@@ -229,6 +242,16 @@ export default function HomePage() {
         </div>
       </main>
 
+      <TutorialModal 
+        isOpen={isTutorialOpen} 
+        onClose={() => setIsTutorialOpen(false)} 
+      />
+      
+      <TutorialModal 
+        isOpen={isTutorialOpen} 
+        onClose={() => setIsTutorialOpen(false)} 
+      />
+      
       {/* Footer */}
       <Footer />
     </div>
