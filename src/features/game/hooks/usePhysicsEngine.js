@@ -404,7 +404,8 @@ export function usePhysicsEngine() {
   const spawnPowerUp = useCallback((x, y, type, onCollect) => {
     if (!worldRef.current) return null;
     
-    const powerup = Matter.Bodies.circle(x, y, 25, {
+    // Increased size from 25 to 40 for better visibility
+    const powerup = Matter.Bodies.circle(x, y, 40, {
       isStatic: true,
       isSensor: true,
       label: "powerup",

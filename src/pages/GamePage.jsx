@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
-import { Home, Settings, Trophy, ShoppingBag, Menu, Star, TrendingUp, ChevronRight, Zap, Bot } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Home, Settings, Trophy, ShoppingBag, Menu, Star, TrendingUp, ChevronRight, Zap, Bot, Crown, Gamepad2, Rocket, Skull, Smile, Target, Flame, Shield, User } from "lucide-react";
 import GameBoard from "../features/game/components/GameBoard";
 import DifficultySelector from "../features/game/components/DifficultySelector";
 import { useGameStore } from "../features/game/store/gameStore";
@@ -22,6 +22,8 @@ export default function GamePage() {
     playerELO,
     playerLevel,
     playerXP,
+    playerName,
+    playerAvatar,
     xpChange,
     eloChange,
     gameMode,
@@ -56,6 +58,24 @@ export default function GamePage() {
     navigate("/");
   };
 
+  // Avatar icons mapping (same as HomePage)
+  const avatarIcons = {
+    user: { icon: User, color: "from-blue-500 to-purple-600" },
+    crown: { icon: Crown, color: "from-yellow-500 to-orange-500" },
+    gamepad: { icon: Gamepad2, color: "from-green-500 to-blue-500" },
+    rocket: { icon: Rocket, color: "from-purple-500 to-pink-500" },
+    skull: { icon: Skull, color: "from-gray-600 to-gray-800" },
+    smile: { icon: Smile, color: "from-yellow-400 to-orange-400" },
+    zap: { icon: Zap, color: "from-yellow-500 to-red-500" },
+    trophy: { icon: Trophy, color: "from-yellow-600 to-yellow-400" },
+    target: { icon: Target, color: "from-red-500 to-pink-500" },
+    star: { icon: Star, color: "from-purple-400 to-blue-400" },
+    flame: { icon: Flame, color: "from-orange-500 to-red-600" },
+    shield: { icon: Shield, color: "from-blue-600 to-indigo-600" }
+  };
+
+  const currentAvatarIcon = avatarIcons[playerAvatar] || avatarIcons.user;
+
   const themeData = getCurrentThemeData();
   const xpRequired = getXPRequired ? getXPRequired() : 100;
   const xpProgress = (playerXP / xpRequired) * 100;
@@ -89,11 +109,11 @@ export default function GamePage() {
 
           <div className="mt-auto p-4 rounded-2xl bg-gray-800/50 border border-gray-700/50">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-gray-900 font-black shadow-lg">
-                {playerLevel}
+              <div className={`w-10 h-10 bg-gradient-to-br ${currentAvatarIcon.color} rounded-full flex items-center justify-center shadow-lg`}>
+                <currentAvatarIcon.icon className="w-5 h-5 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-gray-400 truncate">{player1Name}</p>
+                <p className="text-xs font-bold text-gray-400 truncate">{playerName}</p>
                 <p className="text-sm font-black text-white">{playerELO} ELO</p>
               </div>
             </div>
@@ -113,7 +133,7 @@ export default function GamePage() {
 
           <div className="p-6 border-b border-gray-800/50 flex items-center justify-between bg-gray-900/20 backdrop-blur-sm">
             <div className="flex items-center gap-8">
-              <ScoreCard name={player1Name} score={player1Score} color="from-blue-500 to-blue-600" />
+              <ScoreCard name={playerName} score={player1Score} color={currentAvatarIcon.color} avatar={currentAvatarIcon.icon} />
               <div className="text-gray-600 font-black italic">VS</div>
               <ScoreCard name={player2Name} score={player2Score} color="from-gray-600 to-gray-700" isAI />
             </div>
@@ -323,11 +343,17 @@ function NavBtn({ icon, label, onClick }) {
   );
 }
 
-function ScoreCard({ name, score, color, isAI }) {
+function ScoreCard({ name, score, color, isAI, avatar }) {
   return (
     <div className="flex items-center gap-4">
       <div className={`w-12 h-12 bg-gradient-to-br ${color} rounded-xl shadow-lg flex items-center justify-center`}>
-        {isAI ? <Bot className="w-7 h-7 text-white" /> : <div className="font-black text-white">YOU</div>}
+        {isAI ? (
+          <Bot className="w-7 h-7 text-white" />
+        ) : avatar ? (
+          React.createElement(avatar, { className: "w-7 h-7 text-white" })
+        ) : (
+          <div className="font-black text-white text-xs">YOU</div>
+        )}
       </div>
       <div>
         <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{name}</p>

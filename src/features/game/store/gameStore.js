@@ -106,6 +106,8 @@ export const useGameStore = create(
       playerLevel: 1,
       playerXP: 0,
       playerELO: 1200,
+      playerName: "Player", // Default player name
+      playerAvatar: "user", // Default avatar icon
       
       // Last match changes
       xpChange: 0,
@@ -125,6 +127,8 @@ export const useGameStore = create(
       // Actions
       setGameState: (state) => set({ gameState: state }),
       setDifficulty: (difficulty) => set({ difficulty }),
+      setPlayerName: (name) => set({ playerName: name.trim() || "Player" }),
+      setPlayerAvatar: (avatar) => set({ playerAvatar: avatar }),
       setHideRopeDuringPlay: (hide) => set({ hideRopeDuringPlay: hide }),
       setIsPlayerPlaying: (playing) => set({ isPlayerPlaying: playing }),
       setIsAIPlaying: (playing) => set({ isAIPlaying: playing }),

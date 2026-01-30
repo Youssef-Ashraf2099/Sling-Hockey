@@ -1224,21 +1224,69 @@ export class RenderSystem {
       const y = body.position.y * scale.y;
       const type = body.customData?.type;
 
-      const icons = {
-        MEGA: "🍄",
-        GHOST: "👻",
-        FREEZE: "❄️",
+      const powerUpData = {
+        MEGA: { icon: "🍄", color: "#ff6b6b", name: "MEGA" },
+        GHOST: { icon: "👻", color: "#74c0fc", name: "GHOST" },
+        FREEZE: { icon: "❄️", color: "#51cf66", name: "FREEZE" },
+        SPEED: { icon: "⚡", color: "#ffd43b", name: "SPEED" },
+        MULTI: { icon: "🎯", color: "#ff8cc8", name: "MULTI" },
+        SHIELD: { icon: "🛡️", color: "#845ef7", name: "SHIELD" },
       };
 
-      // Draw floating glow
-      const pulse = Math.sin(this.frame * 0.1) * 5;
+      const powerUp = powerUpData[type] || { icon: "⭐", color: "#ffffff", name: "POWER" };
+
+      // Enhanced floating animation
+      const time = Date.now() * 0.003;
+      const floatY = Math.sin(time + x * 0.01) * 8;
+      const pulse = Math.sin(time * 2) * 0.3 + 0.7;
+      const rotate = Math.sin(time * 0.5) * 0.2;
+
       ctx.save();
+      
+      // Outer glow ring
+      ctx.shadowBlur = 25;
+      ctx.shadowColor = powerUp.color;
+      ctx.strokeStyle = powerUp.color;
+      ctx.lineWidth = 4;
+      ctx.globalAlpha = pulse * 0.6;
+      ctx.beginPath();
+      ctx.arc(x, y + floatY, 45 * scale.x, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Inner glow
       ctx.shadowBlur = 15;
-      ctx.shadowColor = "white";
-      ctx.font = `${30 * scale.x + pulse}px Inter`;
+      ctx.shadowColor = powerUp.color;
+      ctx.globalAlpha = pulse * 0.8;
+      ctx.beginPath();
+      ctx.arc(x, y + floatY, 35 * scale.x, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Reset for icon
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = powerUp.color;
+      ctx.globalAlpha = 1;
+      
+      // Large, animated icon
+      const iconSize = (50 + pulse * 10) * scale.x;
+      ctx.font = `${iconSize}px Arial`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(icons[type] || "⭐", x, y + pulse);
+      
+      // Slight rotation for dynamic feel
+      ctx.translate(x, y + floatY);
+      ctx.rotate(rotate);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(powerUp.icon, 0, 0);
+      ctx.rotate(-rotate);
+      ctx.translate(-x, -(y + floatY));
+      
+      // Power-up name label
+      ctx.shadowBlur = 5;
+      ctx.shadowColor = "#000000";
+      ctx.font = `bold ${12 * scale.x}px Arial`;
+      ctx.fillStyle = powerUp.color;
+      ctx.fillText(powerUp.name, x, y + floatY + 60 * scale.y);
+      
       ctx.restore();
     });
   }
