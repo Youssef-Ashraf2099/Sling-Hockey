@@ -26,8 +26,8 @@ export default function ShopPage() {
   const { 
     purchasedSkins, 
     purchasedThemes, 
-    currentSkin, 
-    currentTheme,
+    equippedSkin, 
+    equippedTheme,
     equipSkin,
     equipTheme,
     unlockWithAd,
@@ -58,8 +58,8 @@ export default function ShopPage() {
       : purchasedThemes.includes(item.id);
     
     const isEquipped = type === "puck" 
-      ? currentSkin === item.id 
-      : currentTheme === item.id;
+      ? equippedSkin === item.id 
+      : equippedTheme === item.id;
 
     const isLevelLocked = playerLevel < (item.requiredLevel || 1);
 
@@ -88,32 +88,7 @@ export default function ShopPage() {
             )}
 
             {type === "puck" ? (
-              <div className="relative flex items-center justify-center">
-                <div 
-                  className="absolute inset-0 blur-2xl opacity-20 rounded-full scale-150"
-                  style={{ backgroundColor: item.color }}
-                />
-                
-                {["basketball", "football", "volleyball"].includes(item.id) ? (
-                   <div className="text-7xl relative z-10 drop-shadow-2xl filter saturate-125">
-                     {item.id === "basketball" && "🏀"}
-                     {item.id === "football" && "🏈"}
-                     {item.id === "volleyball" && "🏐"}
-                   </div>
-                ) : (
-                  <div 
-                    className="w-24 h-24 rounded-full shadow-2xl relative flex items-center justify-center border-2 border-white/10 overflow-hidden z-10"
-                    style={{ 
-                     background: `radial-gradient(circle at 30% 30%, ${item.color}, #000)`,
-                     boxShadow: `inset -8px -8px 16px rgba(0,0,0,0.6), 0 15px 30px rgba(0,0,0,0.4)`
-                    }}
-                  >
-                    <div className="absolute top-4 left-4 w-8 h-8 bg-white/40 rounded-full blur-[2px]" />
-                    {item.id === "gold" && <div className="text-3xl">✨</div>}
-                  </div>
-                )
-                }
-              </div>
+              <PuckPreview skinId={item.id} skinData={item} />
             ) : (
               <div className="w-full h-full flex flex-col p-4 relative">
                 <div className="absolute inset-0 opacity-10" style={{ backgroundImage: `radial-gradient(${item.dividerColor} 1px, transparent 1px)`, backgroundSize: '10px 10px' }} />
@@ -253,6 +228,449 @@ export default function ShopPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// PuckPreview component with high-quality SVG-based rendering
+function PuckPreview({ skinId, skinData }) {
+  const renderPuckSVG = () => {
+    const size = 96;
+    const radius = size * 0.4;
+    const centerX = size / 2;
+    const centerY = size / 2;
+
+    switch (skinId) {
+      case 'basketball':
+      case 'football':
+      case 'volleyball':
+      case 'soccer':
+        const sportEmojis = {
+          basketball: '🏀',
+          football: '🏈', 
+          volleyball: '🏐',
+          soccer: '⚽'
+        };
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <text x={centerX} y={centerY} textAnchor="middle" dominantBaseline="middle" fontSize="72" style={{userSelect: 'none'}}>
+              {sportEmojis[skinId]}
+            </text>
+          </svg>
+        );
+
+      case 'rainbow_ball':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id="rainbowBallGrad" cx="30%" cy="30%">
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="20%" stopColor="#ff0000" />
+                <stop offset="35%" stopColor="#ff8800" />
+                <stop offset="50%" stopColor="#ffff00" />
+                <stop offset="65%" stopColor="#00ff00" />
+                <stop offset="80%" stopColor="#0088ff" />
+                <stop offset="100%" stopColor="#8800ff" />
+              </radialGradient>
+              <filter id="rainbowShine">
+                <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                <feMerge> 
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+            <circle cx={centerX} cy={centerY} r={radius} fill="url(#rainbowBallGrad)" filter="url(#rainbowShine)" stroke="#fff" strokeWidth="1"/>
+            <circle cx={centerX - radius * 0.3} cy={centerY - radius * 0.3} r={radius * 0.2} fill="rgba(255,255,255,0.6)"/>
+          </svg>
+        );
+
+      case 'disco_ball':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id="discoGrad" cx="30%" cy="30%">
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="50%" stopColor="#cccccc" />
+                <stop offset="100%" stopColor="#666666" />
+              </radialGradient>
+              <filter id="discoSparkle">
+                <feGaussianBlur stdDeviation="1" result="coloredBlur"/>
+                <feMerge> 
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+            <circle cx={centerX} cy={centerY} r={radius} fill="url(#discoGrad)" stroke="#fff" strokeWidth="1"/>
+            {/* Mirror tiles */}
+            {Array.from({length: 12}).map((_, i) => {
+              const angle = (i * Math.PI * 2) / 12;
+              const x = centerX + Math.cos(angle) * radius * 0.6;
+              const y = centerY + Math.sin(angle) * radius * 0.6;
+              return (
+                <rect key={i} x={x-3} y={y-3} width="6" height="6" fill="#ffffff" filter="url(#discoSparkle)" opacity="0.8"/>
+              );
+            })}
+            <text x={centerX} y={centerY + radius + 15} textAnchor="middle" fill="#666" fontSize="8">✨</text>
+          </svg>
+        );
+
+      case 'pulse_ball':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id="pulseGrad" cx="50%" cy="50%">
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="30%" stopColor="#00ffff" />
+                <stop offset="70%" stopColor="#0088ff" />
+                <stop offset="100%" stopColor="#000088" />
+              </radialGradient>
+              <filter id="pulseGlow">
+                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                <feMerge> 
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+            <circle cx={centerX} cy={centerY} r={radius} fill="url(#pulseGrad)" filter="url(#pulseGlow)"/>
+            <circle cx={centerX} cy={centerY} r={radius * 0.7} fill="none" stroke="#ffffff" strokeWidth="2" opacity="0.5">
+              <animate attributeName="r" values={`${radius * 0.3};${radius * 0.8};${radius * 0.3}`} dur="2s" repeatCount="indefinite"/>
+              <animate attributeName="opacity" values="0.8;0.2;0.8" dur="2s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+        );
+
+      case 'orbit_ball':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id="orbitGrad" cx="30%" cy="30%">
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="50%" stopColor="#4444ff" />
+                <stop offset="100%" stopColor="#000044" />
+              </radialGradient>
+            </defs>
+            <circle cx={centerX} cy={centerY} r={radius} fill="url(#orbitGrad)" stroke="#fff" strokeWidth="1"/>
+            <circle cx={centerX} cy={centerY} r={radius * 0.8} fill="none" stroke="#ffffff" strokeWidth="1" opacity="0.3"/>
+            <circle r="3" fill="#ffff00">
+              <animateMotion dur="3s" repeatCount="indefinite">
+                <path d={`M ${centerX + radius * 0.8} ${centerY} A ${radius * 0.8} ${radius * 0.8} 0 1 1 ${centerX - radius * 0.8} ${centerY} A ${radius * 0.8} ${radius * 0.8} 0 1 1 ${centerX + radius * 0.8} ${centerY}`}/>
+              </animateMotion>
+            </circle>
+          </svg>
+        );
+
+      case 'smiley':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id="smileyGrad" cx="30%" cy="30%">
+                <stop offset="0%" stopColor="#ffdd44" />
+                <stop offset="100%" stopColor="#cc9900" />
+              </radialGradient>
+            </defs>
+            <circle cx={centerX} cy={centerY} r={radius} fill="url(#smileyGrad)" stroke="#000" strokeWidth="2"/>
+            <circle cx={centerX - radius * 0.3} cy={centerY - radius * 0.2} r={radius * 0.1} fill="#000"/>
+            <circle cx={centerX + radius * 0.3} cy={centerY - radius * 0.2} r={radius * 0.1} fill="#000"/>
+            <path d={`M ${centerX - radius * 0.5} ${centerY + radius * 0.1} Q ${centerX} ${centerY + radius * 0.6} ${centerX + radius * 0.5} ${centerY + radius * 0.1}`} 
+                  fill="none" stroke="#000" strokeWidth="3"/>
+          </svg>
+        );
+
+      case 'fire_emoji':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id="fireGrad" cx="50%" cy="50%">
+                <stop offset="0%" stopColor="#ff4444" />
+                <stop offset="50%" stopColor="#ff8800" />
+                <stop offset="100%" stopColor="#ffaa00" />
+              </radialGradient>
+            </defs>
+            <circle cx={centerX} cy={centerY} r={radius} fill="url(#fireGrad)"/>
+            <path d={`M ${centerX} ${centerY + radius} Q ${centerX - radius * 0.5} ${centerY} ${centerX} ${centerY - radius * 0.8} Q ${centerX + radius * 0.5} ${centerY} ${centerX} ${centerY + radius}`} 
+                  fill="#ff0000"/>
+          </svg>
+        );
+
+      case 'star':
+      case 'star_emoji':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id="starGrad" cx="30%" cy="30%">
+                <stop offset="0%" stopColor="#ffff44" />
+                <stop offset="100%" stopColor="#ccaa00" />
+              </radialGradient>
+            </defs>
+            <circle cx={centerX} cy={centerY} r={radius} fill="url(#starGrad)" stroke="#000" strokeWidth="1"/>
+            <path d={`M ${centerX} ${centerY - radius * 0.7} L ${centerX + radius * 0.2} ${centerY - radius * 0.2} L ${centerX + radius * 0.7} ${centerY - radius * 0.2} L ${centerX + radius * 0.3} ${centerY + radius * 0.1} L ${centerX + radius * 0.4} ${centerY + radius * 0.7} L ${centerX} ${centerY + radius * 0.3} L ${centerX - radius * 0.4} ${centerY + radius * 0.7} L ${centerX - radius * 0.3} ${centerY + radius * 0.1} L ${centerX - radius * 0.7} ${centerY - radius * 0.2} L ${centerX - radius * 0.2} ${centerY - radius * 0.2} Z`} 
+                  fill="#ffff00" stroke="#000" strokeWidth="1"/>
+          </svg>
+        );
+
+      case 'hexagon':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id="hexGrad" cx="30%" cy="30%">
+                <stop offset="0%" stopColor="#44bb88" />
+                <stop offset="100%" stopColor="#226644" />
+              </radialGradient>
+            </defs>
+            <polygon points={[0,1,2,3,4,5].map(i => {
+              const angle = (i * Math.PI) / 3;
+              const x = centerX + Math.cos(angle) * radius * 0.8;
+              const y = centerY + Math.sin(angle) * radius * 0.8;
+              return `${x},${y}`;
+            }).join(' ')} fill="url(#hexGrad)" stroke="#000" strokeWidth="2"/>
+          </svg>
+        );
+
+      case 'triangle':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id="triangleGrad" cx="30%" cy="30%">
+                <stop offset="0%" stopColor="#ffaa44" />
+                <stop offset="100%" stopColor="#cc6600" />
+              </radialGradient>
+            </defs>
+            <polygon points={`${centerX},${centerY - radius * 0.8} ${centerX - radius * 0.7},${centerY + radius * 0.4} ${centerX + radius * 0.7},${centerY + radius * 0.4}`} 
+                     fill="url(#triangleGrad)" stroke="#000" strokeWidth="2"/>
+          </svg>
+        );
+
+      case 'neon_glow':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id="neonGrad" cx="50%" cy="50%">
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="30%" stopColor="#00ffff" />
+                <stop offset="100%" stopColor="#0088cc" />
+              </radialGradient>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                <feMerge> 
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+            <circle cx={centerX} cy={centerY} r={radius} fill="url(#neonGrad)" filter="url(#glow)"/>
+          </svg>
+        );
+
+      case 'hacker':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <circle cx={centerX} cy={centerY} r={radius} fill="#000000" stroke="#00ff41" strokeWidth="2"/>
+            <text x={centerX} y={centerY - radius * 0.3} textAnchor="middle" fill="#00ff41" fontSize="12" fontFamily="monospace">01</text>
+            <text x={centerX - radius * 0.5} y={centerY} textAnchor="middle" fill="#00ff41" fontSize="12" fontFamily="monospace">10</text>
+            <text x={centerX + radius * 0.5} y={centerY} textAnchor="middle" fill="#00ff41" fontSize="12" fontFamily="monospace">11</text>
+            <text x={centerX} y={centerY + radius * 0.5} textAnchor="middle" fill="#00ff41" fontSize="20" fontFamily="monospace">$</text>
+          </svg>
+        );
+
+      case 'matrix_code':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <circle cx={centerX} cy={centerY} r={radius} fill="#003300" stroke="#00ff41" strokeWidth="2"/>
+            <text x={centerX} y={centerY - radius * 0.4} textAnchor="middle" fill="#00ff41" fontSize="10" fontFamily="monospace">01</text>
+            <text x={centerX - radius * 0.6} y={centerY - radius * 0.2} textAnchor="middle" fill="#00ff41" fontSize="8" fontFamily="monospace">ア</text>
+            <text x={centerX + radius * 0.6} y={centerY - radius * 0.2} textAnchor="middle" fill="#00ff41" fontSize="8" fontFamily="monospace">イ</text>
+            <text x={centerX - radius * 0.4} y={centerY + radius * 0.2} textAnchor="middle" fill="#00ff41" fontSize="8" fontFamily="monospace">10</text>
+            <text x={centerX + radius * 0.4} y={centerY + radius * 0.2} textAnchor="middle" fill="#00ff41" fontSize="8" fontFamily="monospace">ウ</text>
+            <text x={centerX} y={centerY + radius * 0.6} textAnchor="middle" fill="#00ff41" fontSize="10" fontFamily="monospace">11</text>
+          </svg>
+        );
+
+      case 'rocket_emoji':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <circle cx={centerX} cy={centerY} r={radius} fill="#1a1a2e" stroke="#fff" strokeWidth="2"/>
+            <rect x={centerX - radius * 0.2} y={centerY - radius * 0.6} width={radius * 0.4} height={radius * 1.2} fill="#cccccc"/>
+            <polygon points={`${centerX},${centerY - radius * 0.8} ${centerX - radius * 0.2},${centerY - radius * 0.6} ${centerX + radius * 0.2},${centerY - radius * 0.6}`} fill="#ff4444"/>
+            <polygon points={`${centerX - radius * 0.1},${centerY + radius * 0.6} ${centerX},${centerY + radius * 0.9} ${centerX + radius * 0.1},${centerY + radius * 0.6}`} fill="#ffaa00"/>
+          </svg>
+        );
+
+      case 'lightning_emoji':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <filter id="lightningGlow">
+                <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                <feMerge> 
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+            <circle cx={centerX} cy={centerY} r={radius} fill="#1a1a2e"/>
+            <path d={`M ${centerX - radius * 0.2} ${centerY - radius * 0.7} L ${centerX + radius * 0.3} ${centerY - radius * 0.7} L ${centerX - radius * 0.1} ${centerY} L ${centerX + radius * 0.2} ${centerY} L ${centerX - radius * 0.3} ${centerY + radius * 0.7} L ${centerX + radius * 0.1} ${centerY} L ${centerX - radius * 0.2} ${centerY - radius * 0.7}`} 
+                  fill="#ffff00" filter="url(#lightningGlow)"/>
+          </svg>
+        );
+
+      case 'gem_emoji':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <linearGradient id="gemGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="30%" stopColor="#00ffff" />
+                <stop offset="100%" stopColor="#0066cc" />
+              </linearGradient>
+            </defs>
+            <path d={`M ${centerX} ${centerY - radius * 0.8} L ${centerX + radius * 0.6} ${centerY - radius * 0.3} L ${centerX + radius * 0.4} ${centerY + radius * 0.8} L ${centerX - radius * 0.4} ${centerY + radius * 0.8} L ${centerX - radius * 0.6} ${centerY - radius * 0.3} Z`} 
+                  fill="url(#gemGrad)" stroke="#fff" strokeWidth="1"/>
+            <line x1={centerX} y1={centerY - radius * 0.8} x2={centerX} y2={centerY + radius * 0.2} stroke="#fff" strokeWidth="1"/>
+            <line x1={centerX - radius * 0.6} y1={centerY - radius * 0.3} x2={centerX + radius * 0.6} y2={centerY - radius * 0.3} stroke="#fff" strokeWidth="1"/>
+          </svg>
+        );
+
+      case 'crown_emoji':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <circle cx={centerX} cy={centerY} r={radius} fill="#fbbf24"/>
+            <path d={`M ${centerX - radius * 0.6} ${centerY + radius * 0.3} L ${centerX - radius * 0.4} ${centerY - radius * 0.2} L ${centerX - radius * 0.2} ${centerY + radius * 0.1} L ${centerX} ${centerY - radius * 0.5} L ${centerX + radius * 0.2} ${centerY + radius * 0.1} L ${centerX + radius * 0.4} ${centerY - radius * 0.2} L ${centerX + radius * 0.6} ${centerY + radius * 0.3} Z`} 
+                  fill="#ffdd00"/>
+            <circle cx={centerX} cy={centerY - radius * 0.2} r={radius * 0.1} fill="#ff0000"/>
+          </svg>
+        );
+
+      case 'alien_emoji':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <circle cx={centerX} cy={centerY} r={radius} fill="#10b981"/>
+            <ellipse cx={centerX} cy={centerY - radius * 0.1} rx={radius * 0.6} ry={radius * 0.8} fill="#00ff88"/>
+            <ellipse cx={centerX - radius * 0.2} cy={centerY - radius * 0.2} rx={radius * 0.15} ry={radius * 0.25} fill="#000"/>
+            <ellipse cx={centerX + radius * 0.2} cy={centerY - radius * 0.2} rx={radius * 0.15} ry={radius * 0.25} fill="#000"/>
+          </svg>
+        );
+
+      case 'skull_emoji':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <circle cx={centerX} cy={centerY} r={radius} fill="#f3f4f6" stroke="#000" strokeWidth="2"/>
+            <circle cx={centerX - radius * 0.25} cy={centerY - radius * 0.2} r={radius * 0.15} fill="#000"/>
+            <circle cx={centerX + radius * 0.25} cy={centerY - radius * 0.2} r={radius * 0.15} fill="#000"/>
+            <path d={`M ${centerX} ${centerY} L ${centerX - radius * 0.1} ${centerY + radius * 0.2} L ${centerX + radius * 0.1} ${centerY + radius * 0.2} Z`} fill="#000"/>
+          </svg>
+        );
+
+      case 'rainbow_emoji':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <circle cx={centerX} cy={centerY} r={radius} fill="#87ceeb"/>
+            {["#ff0000", "#ff8800", "#ffff00", "#00ff00", "#0088ff", "#4400ff"].map((color, i) => (
+              <path key={i} d={`M ${centerX - radius * 0.8 + i * radius * 0.08} ${centerY + radius * 0.3} A ${radius * 0.8 - i * radius * 0.08} ${radius * 0.8 - i * radius * 0.08} 0 0 1 ${centerX + radius * 0.8 - i * radius * 0.08} ${centerY + radius * 0.3}`} 
+                    fill="none" stroke={color} strokeWidth={radius * 0.08}/>
+            ))}
+          </svg>
+        );
+
+      case 'snowflake_emoji':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <circle cx={centerX} cy={centerY} r={radius} fill="#a5f3fc"/>
+            {[0, 1, 2, 3, 4, 5].map(i => {
+              const angle = (i * Math.PI) / 3;
+              const endX = centerX + Math.cos(angle) * radius * 0.7;
+              const endY = centerY + Math.sin(angle) * radius * 0.7;
+              const branchX = centerX + Math.cos(angle) * radius * 0.4;
+              const branchY = centerY + Math.sin(angle) * radius * 0.4;
+              return (
+                <g key={i}>
+                  <line x1={centerX} y1={centerY} x2={endX} y2={endY} stroke="#fff" strokeWidth="2"/>
+                  <line x1={branchX + Math.cos(angle + Math.PI/4) * radius * 0.2} y1={branchY + Math.sin(angle + Math.PI/4) * radius * 0.2} 
+                        x2={branchX} y2={branchY} stroke="#fff" strokeWidth="2"/>
+                  <line x1={branchX} y1={branchY} 
+                        x2={branchX + Math.cos(angle - Math.PI/4) * radius * 0.2} y2={branchY + Math.sin(angle - Math.PI/4) * radius * 0.2} stroke="#fff" strokeWidth="2"/>
+                </g>
+              );
+            })}
+          </svg>
+        );
+
+      case 'octagon':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id="octGrad" cx="30%" cy="30%">
+                <stop offset="0%" stopColor="#bb88ff" />
+                <stop offset="100%" stopColor="#6644aa" />
+              </radialGradient>
+            </defs>
+            <polygon points={[0,1,2,3,4,5,6,7].map(i => {
+              const angle = (i * Math.PI) / 4;
+              const x = centerX + Math.cos(angle) * radius * 0.8;
+              const y = centerY + Math.sin(angle) * radius * 0.8;
+              return `${x},${y}`;
+            }).join(' ')} fill="url(#octGrad)" stroke="#000" strokeWidth="2"/>
+          </svg>
+        );
+
+      case 'heart':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id="heartGrad" cx="30%" cy="30%">
+                <stop offset="0%" stopColor="#ff88bb" />
+                <stop offset="100%" stopColor="#cc2266" />
+              </radialGradient>
+            </defs>
+            <path d={`M ${centerX} ${centerY + radius * 0.7} C ${centerX} ${centerY + radius * 0.7} ${centerX - radius * 0.5} ${centerY} ${centerX - radius * 0.25} ${centerY - radius * 0.25} C ${centerX - radius * 0.25} ${centerY - radius * 0.25} ${centerX} ${centerY - radius * 0.25} ${centerX} ${centerY - radius * 0.25} C ${centerX} ${centerY - radius * 0.25} ${centerX + radius * 0.25} ${centerY - radius * 0.25} ${centerX + radius * 0.25} ${centerY - radius * 0.25} C ${centerX + radius * 0.5} ${centerY} ${centerX} ${centerY + radius * 0.7} ${centerX} ${centerY + radius * 0.7}`} 
+                  fill="url(#heartGrad)" stroke="#000" strokeWidth="2"/>
+          </svg>
+        );
+
+      case 'diamond_shape':
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id="diamondGrad" cx="30%" cy="30%">
+                <stop offset="0%" stopColor="#dd88ff" />
+                <stop offset="100%" stopColor="#8844aa" />
+              </radialGradient>
+            </defs>
+            <polygon points={`${centerX},${centerY - radius * 0.8} ${centerX + radius * 0.6},${centerY} ${centerX},${centerY + radius * 0.8} ${centerX - radius * 0.6},${centerY}`} 
+                     fill="url(#diamondGrad)" stroke="#000" strokeWidth="2"/>
+          </svg>
+        );
+
+      default:
+        // Default circular puck with gradient
+        const color = skinData?.color || "#ffffff";
+        return (
+          <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+            <defs>
+              <radialGradient id={`defaultGrad-${skinId}`} cx="30%" cy="30%">
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="70%" stopColor={color} />
+                <stop offset="100%" stopColor="#000000" />
+              </radialGradient>
+            </defs>
+            <circle cx={centerX} cy={centerY} r={radius} fill={`url(#defaultGrad-${skinId})`} stroke="#000" strokeWidth="2"/>
+            <circle cx={centerX - radius * 0.3} cy={centerY - radius * 0.3} r={radius * 0.2} fill="rgba(255,255,255,0.4)"/>
+          </svg>
+        );
+    }
+  };
+
+  return (
+    <div className="relative flex items-center justify-center w-24 h-24">
+      <div 
+        className="absolute inset-0 blur-2xl opacity-20 rounded-full scale-150"
+        style={{ backgroundColor: skinData?.color || "#ffffff" }}
+      />
+      <div className="relative z-10 drop-shadow-2xl">
+        {renderPuckSVG()}
+      </div>
     </div>
   );
 }

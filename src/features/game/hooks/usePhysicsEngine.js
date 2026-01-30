@@ -293,6 +293,7 @@ export function usePhysicsEngine() {
           player: 1,
           team: "player",
           skinId: skinData.id,
+          skinData: skinData, // Pass complete skin data for rendering
           index,
         },
         collisionFilter: {
@@ -324,6 +325,7 @@ export function usePhysicsEngine() {
           player: 2,
           team: "opponent",
           skinId: skinData.id,
+          skinData: skinData, // Pass complete skin data for rendering
           index,
         },
         collisionFilter: {
