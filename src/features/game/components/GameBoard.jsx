@@ -66,12 +66,13 @@ export default function GameBoard({ theme }) {
     }
   }, [gameState, resetPucks]);
 
-  // Initialize AI controller
+  // Initialize AI controller and update when difficulty changes
   useEffect(() => {
     if ((gameMode === "PVE" || gameMode === "PARTY") && difficulty) {
       aiControllerRef.current = new AIController(difficulty);
+      console.log(`🤖 AI Controller initialized with difficulty: ${difficulty}`);
     }
-  }, [gameMode, difficulty]);
+  }, [gameMode, difficulty]); // Added difficulty to dependency array
 
   // Game loop with rendering
   useEffect(() => {
@@ -219,12 +220,49 @@ export default function GameBoard({ theme }) {
     [engine, screenToVirtual, dragState.isDragging]
   );
 
-  // Continuous AI Loop - DISABLED (AI removed from balls, now just visual skins)
-  // AI functionality removed as requested - balls now use skins instead of AI
+  // AI Controller for opponent moves
   useEffect(() => {
-    // AI system disabled - balls are now purely cosmetic with different skins
-    // Players control all balls manually using slingshot mechanics
-  }, []);
+    if (gameMode !== "PVE" && gameMode !== "PARTY") return;
+    if (gameState !== "PLAYING") return;
+
+    const interval = setInterval(() => {
+      // AI stops shooting if frozen powerup is active
+      if (activePowerUps.slotFrozen) return;
+
+      if (aiControllerRef.current) {
+        if (aiControllerRef.current.isShooting) {
+          // Don't log this every time, it's too spammy
+          return;
+        }
+        
+        console.log("🤖 AI attempting to shoot...");
+        
+        // Get the current active puck ID and slot position at the time of shooting
+        const currentActivePuckId = dragState.activePuck?.id;
+        
+        aiControllerRef.current.executeShot(pucks, engine, applyForce, currentActivePuckId, slotOffsetRef.current, isMoving)
+          .then((shot) => {
+            if (shot) {
+              console.log("🤖 AI shot successful!");
+              setDragState(prev => ({ 
+                ...prev, 
+                reboundTime: Date.now(), 
+                reboundSide: "ai" 
+              }));
+            } else {
+              // Don't log failed shots every time, it's too spammy
+            }
+          })
+          .catch((error) => {
+            console.error("🤖 AI shot error:", error);
+          });
+      } else {
+        console.log("🤖 AI controller not initialized");
+      }
+    }, 500); // Reduced to 500ms for more responsive enhanced AI
+
+    return () => clearInterval(interval);
+  }, [gameMode, gameState, pucks, engine, applyForce, activePowerUps.slotFrozen]); // Removed dragState.activePuck dependency
 
   // Pointer move - free drag and rope collision check with resistance
   const handlePointerMove = useCallback(
@@ -294,27 +332,29 @@ export default function GameBoard({ theme }) {
       const stretchDistance = py - PLAYER_ROPE_Y;
       
       if (stretchDistance > 5) {
-        // FIXED PHYSICS: Calculate launch vector from drag position back to rope anchor
-        // This creates proper slingshot physics - ball launches opposite to pull direction
-        const ropeAnchorX = px; // Use the X position where rope was stretched
+        // IMPROVED PHYSICS: More tactical and less aggressive
+        // This creates proper slingshot physics with subtle horizontal control
+        const ropeAnchorX = GAME_CONFIG.VIRTUAL_WIDTH / 2; // Center X position of rope
         const ropeAnchorY = PLAYER_ROPE_Y;
         
-        // Vector from current drag position back to rope anchor (opposite direction)
-        const dx = ropeAnchorX - px; // Horizontal component (opposite to drag)
-        const dy = ropeAnchorY - py; // Vertical component (opposite to drag)
+        // Calculate horizontal offset from center (for subtle angle control)
+        const horizontalOffset = px - ropeAnchorX; // How far left/right from center
         
-        // Normalize the direction vector
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const normalizedDx = dx / distance;
-        const normalizedDy = dy / distance;
+        // Vertical force is primary (based on stretch distance)
+        const primaryForce = stretchDistance * FORCE_MULTIPLIER * stretchDistance * GAME_CONFIG.VERTICAL_FORCE_DOMINANCE;
         
-        // Force magnitude based on stretch distance
-        const forceMagnitude = stretchDistance * FORCE_MULTIPLIER * stretchDistance * 4.0;
+        // Horizontal force is subtle and proportional to horizontal offset
+        const maxHorizontalOffset = GAME_CONFIG.MAX_HORIZONTAL_OFFSET;
+        const clampedHorizontalOffset = Math.max(-maxHorizontalOffset, Math.min(maxHorizontalOffset, horizontalOffset));
+        const horizontalForce = -(clampedHorizontalOffset / maxHorizontalOffset) * primaryForce * GAME_CONFIG.HORIZONTAL_FORCE_MULTIPLIER;
         
         const force = { 
-          x: normalizedDx * forceMagnitude * 1.2, // Horizontal force (opposite to drag)
-          y: normalizedDy * forceMagnitude        // Vertical force (opposite to drag)
+          x: horizontalForce, // Subtle horizontal force based on drag position
+          y: -primaryForce    // Primary upward force (negative Y = upward)
         };
+
+        // Debug log with more readable values
+        console.log(`Physics Debug: Drag (${px.toFixed(0)}, ${py.toFixed(0)}), Offset: ${horizontalOffset.toFixed(0)}, Force (${force.x.toFixed(2)}, ${force.y.toFixed(2)})`);
 
         try {
           applyForce(puck, force);

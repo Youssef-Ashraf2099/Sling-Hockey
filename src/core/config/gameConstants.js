@@ -17,6 +17,11 @@ export const GAME_CONFIG = {
   ELASTIC_STIFFNESS: 0.1,
   ELASTIC_DAMPING: 0.05,
 
+  // Physics tuning for tactical gameplay
+  HORIZONTAL_FORCE_MULTIPLIER: 0.3, // Controls how much horizontal drag affects shot angle
+  MAX_HORIZONTAL_OFFSET: 200, // Maximum horizontal influence distance
+  VERTICAL_FORCE_DOMINANCE: 4.0, // How much vertical force dominates over horizontal
+
   // Rope anchors (horizontal red lines) - moved towards center for more pull space
   PLAYER_ROPE_Y: 1450, // Moved up from 1650 to give 350 units of pull space
   AI_ROPE_Y: 350,   // Moved down from 150 to give 350 units of pull space
@@ -72,11 +77,32 @@ export const GAME_CONFIG = {
   SLEEP_THRESHOLD: 0.5,
   STUCK_TIMEOUT: 180, // frames (3 seconds at 60fps)
 
-  // AI difficulty settings
+  // AI difficulty settings - Improved accuracy with smaller execution errors
   AI_DIFFICULTY: {
-    EASY: { delay: 0, accuracy: 0.7, maxStretch: 200 },
-    MEDIUM: { delay: 0, accuracy: 0.85, maxStretch: 250 },
-    HARD: { delay: 0, accuracy: 0.95, maxStretch: 300 },
+    EASY: { 
+      delay: 100, 
+      forceError: 0.15, // Reduced from 30% to 15%
+      timingError: 0.2, // Reduced from 40% to 20%
+      positionError: 0.1, // Reduced from 25% to 10%
+      maxStretch: 200, 
+      cooldown: 2000 
+    },
+    MEDIUM: { 
+      delay: 50, 
+      forceError: 0.08, // Reduced from 15% to 8%
+      timingError: 0.1, // Reduced from 20% to 10%
+      positionError: 0.05, // Reduced from 10% to 5%
+      maxStretch: 250, 
+      cooldown: 1500 
+    },
+    HARD: { 
+      delay: 25, 
+      forceError: 0.03, // Reduced from 5% to 3%
+      timingError: 0.02, // Reduced from 5% to 2%
+      positionError: 0.01, // Reduced from 2% to 1%
+      maxStretch: 300, 
+      cooldown: 1000 
+    },
   },
 };
 

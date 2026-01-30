@@ -6,6 +6,8 @@ import { useGameStore } from "../features/game/store/gameStore";
 import { useShopStore } from "../features/shop/store/shopStore";
 import Footer from "../components/layout/Footer";
 import { TutorialModal } from "../features/game/components/TutorialModal";
+import DebugPanel from "../components/DebugPanel";
+import PhysicsTuner from "../components/PhysicsTuner";
 import { useState } from "react";
 
 export default function HomePage() {
@@ -195,6 +197,8 @@ export default function HomePage() {
         onClose={() => setIsTutorialOpen(false)} 
       />
       <Footer />
+      <DebugPanel />
+      <PhysicsTuner />
     </div>
   );
 }

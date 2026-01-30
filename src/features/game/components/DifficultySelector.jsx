@@ -1,7 +1,7 @@
 import { Shield, Zap, Flame, Star, TrendingUp } from "lucide-react";
 import { Modal } from "../../../shared/components/Modal";
 
-export default function DifficultySelector({ isOpen, onSelect, gameMode = "PVE" }) {
+export default function DifficultySelector({ isOpen, onSelect, onClose, gameMode = "PVE" }) {
   const difficulties = [
     {
       id: "EASY",
@@ -39,7 +39,7 @@ export default function DifficultySelector({ isOpen, onSelect, gameMode = "PVE" 
   ];
 
   return (
-    <Modal isOpen={isOpen} title={`Select ${gameMode === 'PARTY' ? 'Party' : 'Arena'} Difficulty`}>
+    <Modal isOpen={isOpen} onClose={onClose} title={`Select ${gameMode === 'PARTY' ? 'Party' : 'Arena'} Difficulty`}>
       <div className="space-y-4">
         {difficulties.map((diff) => {
           const Icon = diff.icon;

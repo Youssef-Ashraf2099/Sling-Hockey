@@ -1,7 +1,34 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { soundManager } from "../../../core/audio/SoundManager";
-import { secureStorage } from "../../../core/security/encryption";
+// import { secureStorage } from "../../../core/security/encryption"; // Temporarily disabled
+
+// Simple storage adapter (no encryption) to fix freezing issue
+const simpleStorageAdapter = {
+  getItem: (name) => {
+    try {
+      const item = localStorage.getItem(name);
+      return item ? JSON.parse(item) : null;
+    } catch (error) {
+      console.error('Storage getItem error:', error);
+      return null;
+    }
+  },
+  setItem: (name, value) => {
+    try {
+      localStorage.setItem(name, JSON.stringify(value));
+    } catch (error) {
+      console.error('Storage setItem error:', error);
+    }
+  },
+  removeItem: (name) => {
+    try {
+      localStorage.removeItem(name);
+    } catch (error) {
+      console.error('Storage removeItem error:', error);
+    }
+  }
+};
 
 // Enhanced ELO system with proper rating calculations
 const ELO_CONFIG = {
@@ -42,19 +69,6 @@ const getRankFromElo = (elo) => {
     }
   }
   return ELO_CONFIG.RATING_RANGES.BRONZE;
-};
-
-// Secure storage adapter for Zustand
-const secureStorageAdapter = {
-  getItem: async (name) => {
-    return await secureStorage.getItem(name);
-  },
-  setItem: async (name, value) => {
-    await secureStorage.setItem(name, value);
-  },
-  removeItem: (name) => {
-    secureStorage.removeItem(name);
-  }
 };
 
 export const useGameStore = create(
@@ -164,6 +178,8 @@ export const useGameStore = create(
       },
 
       endGame: () => {
+        console.log('🎮 endGame() called');
+        
         const {
           player1Score,
           player2Score,
@@ -179,11 +195,15 @@ export const useGameStore = create(
           gamesLost,
         } = get();
 
+        console.log('📊 Game state:', { player1Score, player2Score, playerELO, playerLevel });
+
         const playerWon = player1Score > player2Score;
+        console.log('🏆 Player won:', playerWon);
         
         // Enhanced ELO calculation
         const eloChange = calculateEloChange(playerELO, playerWon, difficulty);
         const newELO = Math.max(0, playerELO + eloChange);
+        console.log('📈 ELO change:', eloChange, 'New ELO:', newELO);
         
         // Enhanced XP calculation with level scaling
         const baseXP = {
@@ -195,20 +215,30 @@ export const useGameStore = create(
         const xpConfig = baseXP[difficulty] || baseXP.MEDIUM;
         const levelMultiplier = 1 + (playerLevel - 1) * 0.1; // More XP needed at higher levels
         const xpDelta = Math.round((playerWon ? xpConfig.win : xpConfig.loss) * levelMultiplier);
-        const newXP = Math.max(0, playerXP + xpDelta);
+        let newXP = Math.max(0, playerXP + xpDelta); // Changed to let
+        console.log('⭐ XP change:', xpDelta, 'New XP:', newXP);
 
         // Level progression
         let newLevel = playerLevel;
+        let leveledUp = false;
         const getXPForLevel = (lvl) => Math.round(100 * Math.pow(1.5, lvl - 1));
         
         while (newXP >= getXPForLevel(newLevel)) {
+          console.log('🆙 Level up! From', newLevel, 'to', newLevel + 1);
           newXP -= getXPForLevel(newLevel);
           newLevel++;
+          leveledUp = true;
+        }
+
+        // Play level-up sound if player leveled up
+        if (leveledUp) {
+          setTimeout(() => soundManager.playLevelUp(), 1000); // Delay for dramatic effect
         }
 
         // Streak calculation
         const newStreak = playerWon ? currentStreak + 1 : 0;
         const newBestStreak = Math.max(bestStreak, newStreak);
+        console.log('🔥 Streak:', newStreak, 'Best:', newBestStreak);
 
         // Match history entry
         const matchEntry = {
@@ -227,27 +257,38 @@ export const useGameStore = create(
 
         // Keep only last 20 matches
         const updatedHistory = [matchEntry, ...matchHistory].slice(0, 20);
+        console.log('📚 Match history updated, entries:', updatedHistory.length);
 
         // Get rank info
         const rankInfo = getRankFromElo(newELO);
+        console.log('🏅 New rank:', rankInfo.title);
 
-        set({
-          gameState: "GAME_OVER",
-          playerXP: newXP,
-          playerELO: newELO,
-          playerLevel: newLevel,
-          currentStreak: newStreak,
-          bestStreak: newBestStreak,
-          xpChange: xpDelta,
-          eloChange,
-          gamesPlayed: gamesPlayed + 1,
-          gamesWon: playerWon ? gamesWon + 1 : gamesWon,
-          gamesLost: playerWon ? gamesLost : gamesLost + 1,
-          matchHistory: updatedHistory,
-          currentRank: rankInfo
-        });
+        console.log('💾 Updating game state...');
+        
+        try {
+          set({
+            gameState: "RESULT", // Changed from GAME_OVER to RESULT to show victory modal
+            playerXP: newXP,
+            playerELO: newELO,
+            playerLevel: newLevel,
+            currentStreak: newStreak,
+            bestStreak: newBestStreak,
+            xpChange: xpDelta,
+            eloChange,
+            gamesPlayed: gamesPlayed + 1,
+            gamesWon: playerWon ? gamesWon + 1 : gamesWon,
+            gamesLost: playerWon ? gamesLost : gamesLost + 1,
+            matchHistory: updatedHistory,
+            currentRank: rankInfo
+          });
+          
+          console.log('✅ Game state updated successfully');
+        } catch (error) {
+          console.error('❌ Error updating game state:', error);
+        }
 
         soundManager.playWin();
+        console.log('🎮 endGame() completed');
       },
 
       // Get current rank information
@@ -258,6 +299,12 @@ export const useGameStore = create(
 
       // Get XP needed for next level
       getXPForNextLevel: () => {
+        const { playerLevel } = get();
+        return Math.round(100 * Math.pow(1.5, playerLevel - 1));
+      },
+
+      // Alias for getXPForNextLevel (for compatibility)
+      getXPRequired: () => {
         const { playerLevel } = get();
         return Math.round(100 * Math.pow(1.5, playerLevel - 1));
       },
@@ -312,11 +359,30 @@ export const useGameStore = create(
         if (level >= 10) return "text-emerald-400"; // Semi-Pro
         if (level >= 5) return "text-green-400"; // Amateur
         return "text-gray-400"; // Rookie
-      }
+      },
+
+      resetGame: () => {
+        set({
+          gameState: "HOME",
+          player1Score: 0,
+          player2Score: 0,
+          eloChange: 0,
+          xpChange: 0,
+          aiThinking: false,
+          activePowerUps: {
+            slotFrozen: false,
+            megaPuckId: null,
+            ghostPuckId: null,
+            playerFrozen: false,
+          }
+        });
+      },
+
+      updateTurnTime: () => {},
     }),
     {
-      name: "sling-hockey-secure-v2", // Updated storage key
-      storage: createJSONStorage(() => secureStorageAdapter),
+      name: "sling-hockey-game-simple", // New storage key without encryption
+      storage: createJSONStorage(() => simpleStorageAdapter),
     }
   )
 );

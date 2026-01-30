@@ -7,12 +7,17 @@ import ShopPage from "./pages/ShopPage";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import { useGameStore } from "./features/game/store/gameStore";
+import { resetGameData } from "./utils/resetGame";
+import "./utils/initializeApp"; // Initialize encryption system
 import "./index.css";
 
 function App() {
   const { setGameState, startGame } = useGameStore();
 
   useEffect(() => {
+    // Add reset function to window for debugging
+    window.resetGameData = resetGameData;
+    
     // Electron integration
     if (window.electronAPI) {
       // Handle menu events

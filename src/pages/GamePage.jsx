@@ -7,6 +7,7 @@ import { useGameStore } from "../features/game/store/gameStore";
 import { useShopStore } from "../features/shop/store/shopStore";
 import { Button } from "../shared/components/Button";
 import { Card } from "../shared/components/Card";
+import PhysicsTuner from "../components/PhysicsTuner";
 
 export default function GamePage() {
   const { mode } = useParams();
@@ -157,60 +158,143 @@ export default function GamePage() {
         </aside>
       </div>
 
-      {/* Result Modal */}
+      {/* Enhanced Victory/Defeat Modal with Animations - Compact Version */}
       {gameState === "RESULT" && (
-        <div className="fixed inset-0 bg-gray-950/95 flex items-center justify-center z-[100] p-4 backdrop-blur-xl">
-          <Card className="max-w-md w-full p-8 border-2 border-white/5 bg-gray-900 shadow-2xl overflow-hidden relative">
+        <div className="fixed inset-0 bg-gray-950/95 flex items-center justify-center z-[100] p-4 backdrop-blur-xl animate-fade-in">
+          <Card className="max-w-sm w-full p-6 border-2 border-white/5 bg-gray-900 shadow-2xl overflow-hidden relative animate-scale-in">
+            {/* Animated Background Effects */}
             <div className="absolute inset-0 bg-gradient-to-b from-blue-500/5 to-transparent pointer-events-none" />
+            {player1Score > player2Score && (
+              <>
+                {/* Victory Particles */}
+                <div className="absolute inset-0 pointer-events-none">
+                  {[...Array(15)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="absolute w-1.5 h-1.5 bg-yellow-400 rounded-full animate-float"
+                      style={{
+                        left: `${Math.random() * 100}%`,
+                        top: `${Math.random() * 100}%`,
+                        animationDelay: `${Math.random() * 2}s`,
+                        animationDuration: `${2 + Math.random() * 2}s`
+                      }}
+                    />
+                  ))}
+                </div>
+                {/* Victory Glow */}
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-green-500/10 to-yellow-500/10 animate-pulse pointer-events-none" />
+              </>
+            )}
             
-            <h2 className={`text-5xl font-black mb-2 text-center tracking-tighter ${player1Score > player2Score ? 'text-blue-400' : 'text-gray-500'}`}>
-              {player1Score > player2Score ? "VICTORY" : "DEFEAT"}
-            </h2>
-            <p className="text-center text-gray-400 font-bold mb-8 uppercase tracking-[0.3em] text-xs">Post Match Summary</p>
-
-            <div className="flex justify-center items-baseline gap-6 mb-10">
-              <span className="text-7xl font-black text-white">{player1Score}</span>
-              <span className="text-3xl font-black text-gray-700">:</span>
-              <span className="text-7xl font-black text-gray-600">{player2Score}</span>
+            {/* Main Title with Enhanced Animation - Smaller */}
+            <div className="text-center mb-4">
+              <h2 className={`text-4xl font-black mb-1 tracking-tighter animate-bounce-in ${
+                player1Score > player2Score 
+                  ? 'text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-green-400 to-yellow-400' 
+                  : 'text-gray-500'
+              }`}>
+                {player1Score > player2Score ? "🏆 VICTORY! 🏆" : "💔 DEFEAT 💔"}
+              </h2>
+              
+              {player1Score > player2Score && (
+                <div className="text-yellow-400 text-lg animate-pulse mb-1">
+                  ⭐ ✨ 🎉 ✨ ⭐
+                </div>
+              )}
+              
+              {/* Level Up Indicator - Compact */}
+              {xpChange > 0 && playerLevel > 1 && (
+                <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/30 rounded-lg p-1.5 mb-2 animate-bounce-in">
+                  <div className="text-yellow-400 text-xs font-bold">
+                    🆙 LEVEL UP! Welcome to Level {playerLevel}! 🆙
+                  </div>
+                </div>
+              )}
+              
+              <p className="text-center text-gray-400 font-bold uppercase tracking-[0.3em] text-[10px]">
+                {player1Score > player2Score ? "CHAMPION PERFORMANCE!" : "Post Match Summary"}
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              <RewardCard 
-                label="Rating" 
-                value={eloChange >= 0 ? `+${eloChange}` : eloChange} 
-                sub="ELO" 
-                color={eloChange >= 0 ? "text-green-400" : "text-red-400"} 
-              />
-              <RewardCard 
-                label="Reward" 
-                value={xpChange >= 0 ? `+${xpChange}` : xpChange} 
-                sub="XP" 
-                color={xpChange >= 0 ? "text-blue-400" : "text-red-400"} 
-              />
+            {/* Score Display with Animation - Smaller */}
+            <div className="flex justify-center items-baseline gap-4 mb-6 animate-slide-up">
+              <div className="text-center">
+                <div className="text-[10px] text-blue-400 font-bold mb-1">YOU</div>
+                <span className={`text-5xl font-black ${player1Score > player2Score ? 'text-green-400 animate-pulse' : 'text-white'}`}>
+                  {player1Score}
+                </span>
+              </div>
+              <span className="text-2xl font-black text-gray-700 animate-pulse">:</span>
+              <div className="text-center">
+                <div className="text-[10px] text-red-400 font-bold mb-1">AI</div>
+                <span className="text-5xl font-black text-gray-600">{player2Score}</span>
+              </div>
             </div>
 
-            <div className="mb-10">
-              <div className="flex justify-between items-end mb-2">
+            {/* Rewards Section with Staggered Animation - Compact */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              <div className="animate-slide-up" style={{ animationDelay: '0.2s' }}>
+                <RewardCard 
+                  label="Rating" 
+                  value={eloChange >= 0 ? `+${eloChange}` : eloChange} 
+                  sub="ELO" 
+                  color={eloChange >= 0 ? "text-green-400" : "text-red-400"}
+                  icon="🏆"
+                  compact={true}
+                />
+              </div>
+              <div className="animate-slide-up" style={{ animationDelay: '0.4s' }}>
+                <RewardCard 
+                  label="Experience" 
+                  value={xpChange >= 0 ? `+${xpChange}` : xpChange} 
+                  sub="XP" 
+                  color={xpChange >= 0 ? "text-blue-400" : "text-red-400"}
+                  icon="⭐"
+                  compact={true}
+                />
+              </div>
+            </div>
+
+            {/* Level Progress with Animation - Compact */}
+            <div className="mb-6 animate-slide-up" style={{ animationDelay: '0.6s' }}>
+              <div className="flex justify-between items-end mb-1.5">
                 <div>
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${playerTitleColor}`}>{playerTitle}</span>
-                  <div className="text-xl font-black text-white">Lvl {playerLevel}</div>
+                  <span className={`text-[9px] font-black uppercase tracking-widest ${playerTitleColor}`}>
+                    {playerTitle}
+                  </span>
+                  <div className="text-lg font-black text-white">Lvl {playerLevel}</div>
                 </div>
                 <div className="text-right">
-                  <span className="text-white font-black">{Math.floor(playerXP)}</span>
-                  <span className="text-gray-600 text-xs font-bold"> / {xpRequired} XP</span>
+                  <span className="text-white font-bold text-sm">{Math.floor(playerXP)}</span>
+                  <span className="text-gray-600 text-[10px] font-bold"> / {xpRequired} XP</span>
                 </div>
               </div>
-              <div className="h-3 bg-gray-800 rounded-full overflow-hidden border border-white/5 shadow-inner">
+              <div className="h-2 bg-gray-800 rounded-full overflow-hidden border border-white/5 shadow-inner">
                 <div 
-                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-1000 ease-out" 
+                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-2000 ease-out animate-fill-bar" 
                   style={{ width: `${xpProgress}%` }} 
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 relative z-10">
-              <Button variant="secondary" className="font-bold py-4 text-white" onClick={() => setShowDifficultySelector(true)}>Difficulty</Button>
-              <Button variant="primary" className="font-bold py-4 text-gray-900" onClick={() => startGame(gameMode, difficulty)}>Play Again</Button>
+            {/* Action Buttons with Animation - Compact */}
+            <div className="grid grid-cols-2 gap-2 relative z-10 animate-slide-up" style={{ animationDelay: '0.8s' }}>
+              <Button 
+                variant="secondary" 
+                className="font-bold py-3 text-white hover:scale-105 transition-transform text-sm" 
+                onClick={() => setShowDifficultySelector(true)}
+              >
+                Difficulty
+              </Button>
+              <Button 
+                variant="primary" 
+                className={`font-bold py-3 text-gray-900 hover:scale-105 transition-transform text-sm ${
+                  player1Score > player2Score ? 'animate-pulse bg-gradient-to-r from-green-400 to-blue-400' : ''
+                }`}
+                onClick={() => startGame(gameMode, difficulty)}
+              >
+                {player1Score > player2Score ? '🚀 Again!' : 'Try Again'}
+              </Button>
             </div>
           </Card>
         </div>
@@ -220,8 +304,12 @@ export default function GamePage() {
       <DifficultySelector
         isOpen={showDifficultySelector}
         onSelect={handleDifficultySelect}
+        onClose={() => setShowDifficultySelector(false)}
         gameMode={gameMode}
       />
+      
+      {/* Physics Tuner for real-time adjustments */}
+      <PhysicsTuner />
     </div>
   );
 }
@@ -276,12 +364,13 @@ function QuestItem({ label, progress, total }) {
   );
 }
 
-function RewardCard({ label, value, sub, color }) {
+function RewardCard({ label, value, sub, color, icon, compact = false }) {
   return (
-    <div className="p-4 bg-gray-800/50 rounded-2xl border border-gray-800 text-center">
-      <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-1">{label}</p>
-      <div className={`text-2xl font-black ${color}`}>{value}</div>
-      <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest">{sub}</p>
+    <div className={`${compact ? 'p-3' : 'p-4'} bg-gray-800/50 rounded-2xl border border-gray-800 text-center hover:bg-gray-800/70 transition-colors`}>
+      {icon && <div className={`${compact ? 'text-lg mb-1' : 'text-2xl mb-2'}`}>{icon}</div>}
+      <p className={`text-gray-500 ${compact ? 'text-[9px]' : 'text-[10px]'} font-black uppercase tracking-widest mb-1`}>{label}</p>
+      <div className={`${compact ? 'text-xl' : 'text-2xl'} font-black ${color}`}>{value}</div>
+      <p className={`${compact ? 'text-[9px]' : 'text-[10px]'} font-black text-gray-600 uppercase tracking-widest`}>{sub}</p>
     </div>
   );
 }

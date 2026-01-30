@@ -160,6 +160,26 @@ class SoundManager {
     });
   }
 
+  // Level up celebration sound
+  playLevelUp() {
+    if (!this.isEnabled) return;
+    this.init();
+    this.resume();
+
+    // Ascending magical sound
+    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5 to C6
+    notes.forEach((freq, i) => {
+      this.playNote(freq, 0.15 * i, 0.3, "triangle", 0.08);
+    });
+    
+    // Sparkle effect
+    setTimeout(() => {
+      [1318.51, 1567.98, 2093.00].forEach((freq, i) => {
+        this.playNote(freq, 0.05 * i, 0.2, "sine", 0.04);
+      });
+    }, 200);
+  }
+
   playNote(freq, delay, duration, type = "sine", vol = 0.1) {
     const osc = this.ctx.createOscillator();
     const gain = this.ctx.createGain();

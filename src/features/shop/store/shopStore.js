@@ -1,17 +1,31 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { secureStorage } from "../../core/security/encryption";
+// import { secureStorage } from "../../../core/security/encryption"; // Temporarily disabled
 
-// Secure storage adapter for shop
-const secureStorageAdapter = {
-  getItem: async (name) => {
-    return await secureStorage.getItem(name);
+// Simple storage adapter for shop (no encryption) to fix freezing issue
+const simpleStorageAdapter = {
+  getItem: (name) => {
+    try {
+      const item = localStorage.getItem(name);
+      return item ? JSON.parse(item) : null;
+    } catch (error) {
+      console.error('Shop storage getItem error:', error);
+      return null;
+    }
   },
-  setItem: async (name, value) => {
-    await secureStorage.setItem(name, value);
+  setItem: (name, value) => {
+    try {
+      localStorage.setItem(name, JSON.stringify(value));
+    } catch (error) {
+      console.error('Shop storage setItem error:', error);
+    }
   },
   removeItem: (name) => {
-    secureStorage.removeItem(name);
+    try {
+      localStorage.removeItem(name);
+    } catch (error) {
+      console.error('Shop storage removeItem error:', error);
+    }
   }
 };
 
@@ -92,173 +106,41 @@ export const PUCK_SKINS = {
     color: "#eab308",
     texture: null,
     physics: { mass: 1.8, friction: 0.05, restitution: 0.75, frictionAir: 0.02 },
-// Enhanced shop store with secure storage
-const useShopStore = create(
-  persist(
-    (set, get) => ({
-      // Current equipped items
-      equippedSkin: "classic",
-      equippedTheme: "birch",
-      
-      // Purchased items
-      purchasedSkins: ["classic"],
-      purchasedThemes: ["birch"],
-      
-      // Premium status
-      isPro: false,
-      
-      // Actions
-      equipSkin: (skinId) => {
-        const skin = PUCK_SKINS[skinId];
-        if (!skin) return false;
-        
-        const { purchasedSkins, isPro } = get();
-        if (!purchasedSkins.includes(skinId) && !isPro && skin.isPremium) {
-          return false; // Not purchased
-        }
-        
-        set({ equippedSkin: skinId });
-        return true;
-      },
-      
-      equipTheme: (themeId) => {
-        const theme = BOARD_THEMES[themeId];
-        if (!theme) return false;
-        
-        const { purchasedThemes, isPro } = get();
-        if (!purchasedThemes.includes(themeId) && !isPro && theme.isPremium) {
-          return false; // Not purchased
-        }
-        
-        set({ equippedTheme: themeId });
-        return true;
-      },
-      
-      purchaseSkin: (skinId) => {
-        const skin = PUCK_SKINS[skinId];
-        if (!skin || !skin.isPremium) return false;
-        
-        const { purchasedSkins } = get();
-        if (purchasedSkins.includes(skinId)) return false; // Already owned
-        
-        // In a real app, this would integrate with payment processing
-        set({ 
-          purchasedSkins: [...purchasedSkins, skinId],
-          equippedSkin: skinId 
-        });
-        return true;
-      },
-      
-      purchaseTheme: (themeId) => {
-        const theme = BOARD_THEMES[themeId];
-        if (!theme || !theme.isPremium) return false;
-        
-        const { purchasedThemes } = get();
-        if (purchasedThemes.includes(themeId)) return false; // Already owned
-        
-        // In a real app, this would integrate with payment processing
-        set({ 
-          purchasedThemes: [...purchasedThemes, themeId],
-          equippedTheme: themeId 
-        });
-        return true;
-      },
-      
-      // Simulate ad unlock (for free-to-play model)
-      unlockWithAd: async (itemId, itemType) => {
-        // Simulate ad viewing delay
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        if (itemType === 'skin') {
-          const { purchasedSkins } = get();
-          if (!purchasedSkins.includes(itemId)) {
-            set({ 
-              purchasedSkins: [...purchasedSkins, itemId],
-              equippedSkin: itemId 
-            });
-            return true;
-          }
-        } else if (itemType === 'theme') {
-          const { purchasedThemes } = get();
-          if (!purchasedThemes.includes(itemId)) {
-            set({ 
-              purchasedThemes: [...purchasedThemes, itemId],
-              equippedTheme: itemId 
-            });
-            return true;
-          }
-        }
-        return false;
-      },
-      
-      // Get current skin data for physics
-      getCurrentSkinData: () => {
-        const { equippedSkin } = get();
-        return PUCK_SKINS[equippedSkin] || PUCK_SKINS.classic;
-      },
-      
-      // Get current theme data for rendering
-      getCurrentThemeData: () => {
-        const { equippedTheme } = get();
-        return BOARD_THEMES[equippedTheme] || BOARD_THEMES.birch;
-      },
-      
-      // Check if item is owned
-      isOwned: (itemId, itemType) => {
-        const { purchasedSkins, purchasedThemes, isPro } = get();
-        if (isPro) return true;
-        
-        if (itemType === 'skin') {
-          return purchasedSkins.includes(itemId);
-        } else if (itemType === 'theme') {
-          return purchasedThemes.includes(itemId);
-        }
-        return false;
-      },
-      
-      // Get available items for current level
-      getAvailableItems: (playerLevel) => {
-        const availableSkins = Object.values(PUCK_SKINS).filter(
-          skin => skin.requiredLevel <= playerLevel
-        );
-        const availableThemes = Object.values(BOARD_THEMES).filter(
-          theme => theme.requiredLevel <= playerLevel
-        );
-        
-        return { skins: availableSkins, themes: availableThemes };
-      },
-      
-      // Unlock pro version
-      unlockPro: () => {
-        set({ isPro: true });
-      },
-      
-      // Get shop statistics
-      getShopStats: () => {
-        const { purchasedSkins, purchasedThemes } = get();
-        const totalSkins = Object.keys(PUCK_SKINS).length;
-        const totalThemes = Object.keys(BOARD_THEMES).length;
-        
-        return {
-          skinsOwned: purchasedSkins.length,
-          totalSkins,
-          themesOwned: purchasedThemes.length,
-          totalThemes,
-          completionPercentage: Math.round(
-            ((purchasedSkins.length + purchasedThemes.length) / 
-             (totalSkins + totalThemes)) * 100
-          )
-        };
-      }
-    }),
-    {
-      name: "sling-hockey-shop-secure",
-      storage: createJSONStorage(() => secureStorageAdapter),
-    }
-  )
-);
-
-export { useShopStore, PUCK_SKINS, BOARD_THEMES };
+    description: "Luxury and prestige. Heavy and valuable.",
+  },
+  basketball: {
+    id: "basketball",
+    name: "Basketball",
+    price: 1.49,
+    requiredLevel: 7,
+    isPremium: true,
+    color: "#ff8c00",
+    texture: "basketball",
+    physics: { mass: 1.3, friction: 0.08, restitution: 0.9, frictionAir: 0.03 },
+    description: "Bouncy like a real basketball. High rebound energy.",
+  },
+  football: {
+    id: "football",
+    name: "Football",
+    price: 1.49,
+    requiredLevel: 9,
+    isPremium: true,
+    color: "#8b4513",
+    texture: "football",
+    physics: { mass: 1.4, friction: 0.06, restitution: 0.7, frictionAir: 0.025 },
+    description: "Aerodynamic shape. Stable flight patterns.",
+  },
+  volleyball: {
+    id: "volleyball",
+    name: "Volleyball",
+    price: 1.49,
+    requiredLevel: 6,
+    isPremium: true,
+    color: "#ffffff",
+    texture: "volleyball",
+    physics: { mass: 0.9, friction: 0.04, restitution: 0.85, frictionAir: 0.02 },
+    description: "Light and bouncy. Perfect for quick plays.",
+  },
   // NEW ENHANCED PUCK SKINS
   diamond: {
     id: "diamond",
@@ -508,180 +390,169 @@ export const BOARD_THEMES = {
     description: "Ultimate tech board. Reality-bending visuals.",
   },
 };
-    description: "The ultimate status symbol. Heavy and prestigious.",
-  },
-  basketball: {
-    id: "basketball",
-    name: "Hoops Master",
-    price: 1.49,
-    requiredLevel: 6,
-    isPremium: true,
-    color: "#ea580c",
-    texture: "basketball",
-    physics: { mass: 0.9, friction: 0.06, restitution: 1.2, frictionAir: 0.02 },
-    description: "High bounce performance. Perfect for bank shots.",
-  },
-  football: {
-    id: "football",
-    name: "Gridiron",
-    price: 1.49,
-    requiredLevel: 7,
-    isPremium: true,
-    color: "#451a03",
-    texture: "football",
-    physics: { mass: 1.4, friction: 0.1, restitution: 0.5, frictionAir: 0.04 },
-    description: "Heavy and grounded. Hard to push back.",
-  },
-  volleyball: {
-    id: "volleyball",
-    name: "Beach Spike",
-    price: 1.49,
-    requiredLevel: 4,
-    isPremium: true,
-    color: "#fde047",
-    texture: "volleyball",
-    physics: { mass: 0.6, friction: 0.03, restitution: 1.1, frictionAir: 0.06 },
-    description: "Lightweight and floaty. Unpredictable speed.",
-  },
-};
 
-export const BOARD_THEMES = {
-  birch: {
-    id: "birch",
-    name: "Birch Wood",
-    price: 0,
-    requiredLevel: 1,
-    isPremium: false,
-    backgroundColor: "#d2b48c",
-    dividerColor: "#8b4513",
-    wallColor: "#8b7355",
-    description: "Classic light wood finish.",
-  },
-  mahogany: {
-    id: "mahogany",
-    name: "Mahogany",
-    price: 1.49,
-    requiredLevel: 3,
-    isPremium: true,
-    backgroundColor: "#7b3f00",
-    dividerColor: "#4a2511",
-    wallColor: "#5a2f1a",
-    description: "Rich dark wood. Premium look.",
-  },
-  marble: {
-    id: "marble",
-    name: "Marble Luxury",
-    price: 1.99,
-    requiredLevel: 6,
-    isPremium: true,
-    backgroundColor: "#e8e8e8",
-    dividerColor: "#8b8b8b",
-    wallColor: "#a8a8a8",
-    description: "Elegant stone surface.",
-  },
-  cyber: {
-    id: "cyber",
-    name: "Cyber Grid",
-    price: 2.49,
-    requiredLevel: 10,
-    isPremium: true,
-    backgroundColor: "#0f172a",
-    dividerColor: "#38bdf8",
-    wallColor: "#1e293b",
-    description: "Futuristic neon aesthetics.",
-  },
-  arctic: {
-    id: "arctic",
-    name: "Freezing Point",
-    price: 1.49,
-    requiredLevel: 5,
-    isPremium: true,
-    backgroundColor: "#f0f9ff",
-    dividerColor: "#7dd3fc",
-    wallColor: "#bae6fd",
-    description: "Cool and calm ice rink.",
-  },
-  stadium: {
-    id: "stadium",
-    name: "Neon Stadium",
-    price: 2.99,
-    requiredLevel: 12,
-    isPremium: true,
-    backgroundColor: "#020617",
-    dividerColor: "#22c55e",
-    wallColor: "#1e293b",
-    description: "High stakes under the bright lights.",
-  },
-  volcano: {
-    id: "volcano",
-    name: "Lava Pit",
-    price: 2.99,
-    requiredLevel: 15,
-    isPremium: true,
-    backgroundColor: "#450a0a",
-    dividerColor: "#ef4444",
-    wallColor: "#1a0404",
-    description: "Hot competition in a volcanic arena.",
-  },
-  space: {
-    id: "space",
-    name: "Galactic Rift",
-    price: 2.99,
-    requiredLevel: 20,
-    isPremium: true,
-    backgroundColor: "#0f172a",
-    dividerColor: "#8b5cf6",
-    wallColor: "#020617",
-    description: "Play amongst the stars.",
-  },
-};
-
+// Enhanced shop store with secure storage
 export const useShopStore = create(
   persist(
     (set, get) => ({
-      isPro: false,
+      // Current equipped items
+      equippedSkin: "classic",
+      equippedTheme: "birch",
+      
+      // Purchased items
       purchasedSkins: ["classic"],
       purchasedThemes: ["birch"],
-      currentSkin: "classic",
-      currentTheme: "birch",
-      totalSpent: 0,
-
-      unlockWithAd: (itemId, type) => {
-        return new Promise((resolve) => {
-          setTimeout(() => {
-            if (type === "puck") {
-              set((state) => ({ purchasedSkins: [...state.purchasedSkins, itemId] }));
-            } else {
-              set((state) => ({ purchasedThemes: [...state.purchasedThemes, itemId] }));
-            }
-            resolve(true);
-          }, 2000);
-        });
-      },
-
+      
+      // Premium status
+      isPro: false,
+      
+      // Actions
       equipSkin: (skinId) => {
-        if (get().purchasedSkins.includes(skinId)) set({ currentSkin: skinId });
+        const skin = PUCK_SKINS[skinId];
+        if (!skin) return false;
+        
+        const { purchasedSkins, isPro } = get();
+        if (!purchasedSkins.includes(skinId) && !isPro && skin.isPremium) {
+          return false; // Not purchased
+        }
+        
+        set({ equippedSkin: skinId });
+        return true;
       },
-
+      
       equipTheme: (themeId) => {
-        if (get().purchasedThemes.includes(themeId)) set({ currentTheme: themeId });
+        const theme = BOARD_THEMES[themeId];
+        if (!theme) return false;
+        
+        const { purchasedThemes, isPro } = get();
+        if (!purchasedThemes.includes(themeId) && !isPro && theme.isPremium) {
+          return false; // Not purchased
+        }
+        
+        set({ equippedTheme: themeId });
+        return true;
       },
-
-      upgradeToPro: () => {
-        set({
-          isPro: true,
-          purchasedSkins: Object.keys(PUCK_SKINS),
-          purchasedThemes: Object.keys(BOARD_THEMES),
+      
+      purchaseSkin: (skinId) => {
+        const skin = PUCK_SKINS[skinId];
+        if (!skin || !skin.isPremium) return false;
+        
+        const { purchasedSkins } = get();
+        if (purchasedSkins.includes(skinId)) return false; // Already owned
+        
+        // In a real app, this would integrate with payment processing
+        set({ 
+          purchasedSkins: [...purchasedSkins, skinId],
+          equippedSkin: skinId 
         });
+        return true;
       },
-
-      getCurrentSkinData: () => PUCK_SKINS[get().currentSkin],
-      getCurrentThemeData: () => BOARD_THEMES[get().currentTheme],
-      isItemOwned: (itemId) => get().purchasedSkins.includes(itemId) || get().purchasedThemes.includes(itemId),
+      
+      purchaseTheme: (themeId) => {
+        const theme = BOARD_THEMES[themeId];
+        if (!theme || !theme.isPremium) return false;
+        
+        const { purchasedThemes } = get();
+        if (purchasedThemes.includes(themeId)) return false; // Already owned
+        
+        // In a real app, this would integrate with payment processing
+        set({ 
+          purchasedThemes: [...purchasedThemes, themeId],
+          equippedTheme: themeId 
+        });
+        return true;
+      },
+      
+      // Simulate ad unlock (for free-to-play model)
+      unlockWithAd: async (itemId, itemType) => {
+        // Simulate ad viewing delay
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        if (itemType === 'skin') {
+          const { purchasedSkins } = get();
+          if (!purchasedSkins.includes(itemId)) {
+            set({ 
+              purchasedSkins: [...purchasedSkins, itemId],
+              equippedSkin: itemId 
+            });
+            return true;
+          }
+        } else if (itemType === 'theme') {
+          const { purchasedThemes } = get();
+          if (!purchasedThemes.includes(itemId)) {
+            set({ 
+              purchasedThemes: [...purchasedThemes, itemId],
+              equippedTheme: itemId 
+            });
+            return true;
+          }
+        }
+        return false;
+      },
+      
+      // Get current skin data for physics
+      getCurrentSkinData: () => {
+        const { equippedSkin } = get();
+        return PUCK_SKINS[equippedSkin] || PUCK_SKINS.classic;
+      },
+      
+      // Get current theme data for rendering
+      getCurrentThemeData: () => {
+        const { equippedTheme } = get();
+        return BOARD_THEMES[equippedTheme] || BOARD_THEMES.birch;
+      },
+      
+      // Check if item is owned
+      isOwned: (itemId, itemType) => {
+        const { purchasedSkins, purchasedThemes, isPro } = get();
+        if (isPro) return true;
+        
+        if (itemType === 'skin') {
+          return purchasedSkins.includes(itemId);
+        } else if (itemType === 'theme') {
+          return purchasedThemes.includes(itemId);
+        }
+        return false;
+      },
+      
+      // Get available items for current level
+      getAvailableItems: (playerLevel) => {
+        const availableSkins = Object.values(PUCK_SKINS).filter(
+          skin => skin.requiredLevel <= playerLevel
+        );
+        const availableThemes = Object.values(BOARD_THEMES).filter(
+          theme => theme.requiredLevel <= playerLevel
+        );
+        
+        return { skins: availableSkins, themes: availableThemes };
+      },
+      
+      // Unlock pro version
+      unlockPro: () => {
+        set({ isPro: true });
+      },
+      
+      // Get shop statistics
+      getShopStats: () => {
+        const { purchasedSkins, purchasedThemes } = get();
+        const totalSkins = Object.keys(PUCK_SKINS).length;
+        const totalThemes = Object.keys(BOARD_THEMES).length;
+        
+        return {
+          skinsOwned: purchasedSkins.length,
+          totalSkins,
+          themesOwned: purchasedThemes.length,
+          totalThemes,
+          completionPercentage: Math.round(
+            ((purchasedSkins.length + purchasedThemes.length) / 
+             (totalSkins + totalThemes)) * 100
+          )
+        };
+      }
     }),
     {
-      name: "shop-storage",
-      version: 1,
+      name: "sling-hockey-shop-simple", // Simple storage without encryption
+      storage: createJSONStorage(() => simpleStorageAdapter),
     }
   )
 );
