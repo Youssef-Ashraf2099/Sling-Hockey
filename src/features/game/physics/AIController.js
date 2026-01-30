@@ -94,6 +94,7 @@ export class AIController {
 
     // AI rope position (top line)
     const ropeY = GAME_CONFIG.AI_ROPE_Y;
+    const ropeAnchorX = GAME_CONFIG.VIRTUAL_WIDTH / 2; // Same as player - center X position of rope
 
     // PERFECT TARGETING - AI always aims for the exact center of the slot
     let targetX = slotCenterX;
@@ -121,25 +122,52 @@ export class AIController {
     targetX += positionErrorX;
     targetY += positionErrorY;
 
-    // Calculate the required force direction and magnitude
-    const deltaX = targetX - puck.position.x;
-    const deltaY = targetY - puck.position.y;
-    const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    // NEW ROPE PHYSICS SYSTEM - Same as player!
+    // Calculate where AI needs to position the puck to aim at target
     
-    // Normalize direction
-    const directionX = deltaX / distance;
-    const directionY = deltaY / distance;
-
-    // Improved force calculation - more accurate physics
-    let baseStretch = Math.min(this.maxStretch, distance * 0.5); // Increased multiplier for better reach
+    // Step 1: Calculate horizontal offset from rope center to target
+    const targetHorizontalOffset = targetX - ropeAnchorX;
     
-    // Force Error: AI slightly miscalculates the required force (much smaller errors now)
+    // Step 2: Calculate required stretch distance based on target distance
+    const distanceToTarget = Math.sqrt(
+      Math.pow(targetX - puck.position.x, 2) + 
+      Math.pow(targetY - puck.position.y, 2)
+    );
+    
+    // AI calculates stretch distance based on target distance (with some error)
+    let stretchDistance = Math.min(this.maxStretch, distanceToTarget * 0.3);
+    
+    // Force Error: AI slightly miscalculates the required stretch (much smaller errors now)
     const forceErrorMultiplier = 1 + (Math.random() - 0.5) * this.forceError;
-    baseStretch *= forceErrorMultiplier;
+    stretchDistance *= forceErrorMultiplier;
     
-    const stretchDistance = baseStretch * (0.9 + Math.random() * 0.2); // Tighter range for consistency
+    // Step 3: Position the puck for the shot (same as player system)
+    // AI positions puck at rope line first
+    const aimPositionX = puck.position.x; // Keep current X position initially
+    const aimPositionY = ropeY;
     
-    // Position the puck for the shot
+    // Then AI "drags" the puck to create the stretch
+    const dragPositionX = ropeAnchorX + targetHorizontalOffset * (this.positionError > 0 ? (1 + (Math.random() - 0.5) * this.positionError) : 1);
+    const dragPositionY = ropeY + stretchDistance;
+    
+    // Step 4: Calculate force using the SAME physics as player
+    const horizontalOffset = dragPositionX - ropeAnchorX;
+    
+    // Vertical force is primary (based on stretch distance) - SAME AS PLAYER
+    const primaryForce = stretchDistance * GAME_CONFIG.FORCE_MULTIPLIER * stretchDistance * GAME_CONFIG.VERTICAL_FORCE_DOMINANCE;
+    
+    // Horizontal force is subtle and proportional to horizontal offset - SAME AS PLAYER
+    const maxHorizontalOffset = GAME_CONFIG.MAX_HORIZONTAL_OFFSET;
+    const clampedHorizontalOffset = Math.max(-maxHorizontalOffset, Math.min(maxHorizontalOffset, horizontalOffset));
+    const horizontalForce = -(clampedHorizontalOffset / maxHorizontalOffset) * primaryForce * GAME_CONFIG.HORIZONTAL_FORCE_MULTIPLIER;
+    
+    // For AI (shooting downward), we need to flip the Y direction
+    const force = {
+      x: horizontalForce, // Same horizontal calculation as player
+      y: primaryForce     // Positive Y for AI (shooting downward), negative Y for player (shooting upward)
+    };
+
+    // Position the puck for the shot (pull it back from the rope)
     let pushY = ropeY - stretchDistance;
     
     // CLAMP pushY to ensure ball doesn't go through top wall
@@ -148,27 +176,6 @@ export class AIController {
       pushY = minPadding;
       stretchDistance = ropeY - pushY;
     }
-
-    // Enhanced force calculation with better accuracy
-    const baseForceMagnitude = stretchDistance * GAME_CONFIG.FORCE_MULTIPLIER * stretchDistance;
-    
-    // Minimal Force Direction Error: AI slightly miscalculates the direction
-    const directionErrorX = directionX + (Math.random() - 0.5) * this.forceError * 0.5; // Reduced error
-    const directionErrorY = directionY + (Math.random() - 0.5) * this.forceError * 0.5; // Reduced error
-    
-    // Normalize the error-affected direction
-    const errorMagnitude = Math.sqrt(directionErrorX * directionErrorX + directionErrorY * directionErrorY);
-    const finalDirectionX = directionErrorX / errorMagnitude;
-    const finalDirectionY = directionErrorY / errorMagnitude;
-    
-    // Apply force with improved accuracy
-    const horizontalForce = finalDirectionX * baseForceMagnitude * 0.5; // Increased horizontal component
-    const verticalForce = Math.abs(finalDirectionY) * baseForceMagnitude * 2.5; // Increased vertical force
-    
-    const force = {
-      x: horizontalForce,
-      y: verticalForce,
-    };
 
     this.shotCount++;
     
@@ -228,7 +235,9 @@ export class AIController {
         if (shot) {
           console.log(`🤖 AI executing shot with ${this.difficulty} difficulty (${this.cooldown}ms cooldown, ${timingErrorMs.toFixed(0)}ms timing error)`);
           
-          // 2. Move puck to rope position (setup phase)
+          // NEW ROPE PHYSICS SIMULATION - Same as player!
+          
+          // Step 1: Move puck to rope line (like player grabbing the puck)
           try {
             Matter.Body.setPosition(shot.puck, {
               x: shot.puck.position.x,
@@ -236,7 +245,7 @@ export class AIController {
             });
             Matter.Body.setVelocity(shot.puck, { x: 0, y: 0 });
 
-            // 3. Setup phase with timing errors
+            // Step 2: "Drag" the puck to stretch the rope (like player dragging)
             let setupTime = this.difficulty === "HARD" ? 60 : this.difficulty === "MEDIUM" ? 80 : 120;
             
             // Setup Timing Error: AI might rush or delay the setup
@@ -246,12 +255,20 @@ export class AIController {
             
             setTimeout(() => {
               try {
+                // Calculate the drag position (where AI "drags" the puck to)
+                const ropeAnchorX = GAME_CONFIG.VIRTUAL_WIDTH / 2;
+                const targetHorizontalOffset = shot.targetX - ropeAnchorX;
+                
+                // AI positions puck as if dragging it (with some error)
+                const dragPositionX = ropeAnchorX + targetHorizontalOffset * (1 + (Math.random() - 0.5) * this.positionError);
+                const dragPositionY = shot.pushY; // This is ropeY + stretchDistance
+                
                 Matter.Body.setPosition(shot.puck, {
-                  x: shot.puck.position.x,
-                  y: shot.pushY,
+                  x: dragPositionX,
+                  y: dragPositionY,
                 });
                 
-                // 4. Release phase with timing errors
+                // Step 3: Release the puck (like player releasing)
                 let releaseTime = this.difficulty === "HARD" ? 30 : this.difficulty === "MEDIUM" ? 50 : 80;
                 
                 // Release Timing Error: AI might release too early or too late
@@ -261,7 +278,10 @@ export class AIController {
                 
                 setTimeout(() => {
                   try {
+                    // Apply the force using the new rope physics
                     applyForce(shot.puck, shot.force);
+                    
+                    console.log(`🤖 AI Rope Physics: Drag (${dragPositionX.toFixed(0)}, ${dragPositionY.toFixed(0)}), Target (${shot.targetX.toFixed(0)}, ${shot.targetY.toFixed(0)}), Force (${shot.force.x.toFixed(3)}, ${shot.force.y.toFixed(3)})`);
                     
                     // Reset shooting state immediately after shot
                     this.isShooting = false;
