@@ -1,35 +1,60 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { soundManager } from "../../../core/audio/SoundManager";
+import { secureStorage } from "../../../core/security/encryption";
 
-// Simple Obfuscation to prevent easy "progress theft"
-const SALT = "sling_hockey_secret_2024";
-const obfuscate = (str) => {
-  return btoa(str.split('').map((char, i) => 
-    String.fromCharCode(char.charCodeAt(0) ^ SALT.charCodeAt(i % SALT.length))
-  ).join(''));
-};
-
-const deobfuscate = (str) => {
-  try {
-    const decoded = atob(str);
-    return decoded.split('').map((char, i) => 
-      String.fromCharCode(char.charCodeAt(0) ^ SALT.charCodeAt(i % SALT.length))
-    ).join('');
-  } catch (e) {
-    return "{}";
+// Enhanced ELO system with proper rating calculations
+const ELO_CONFIG = {
+  BASE_RATING: 1200,
+  K_FACTOR: {
+    EASY: { win: 15, loss: 10 },
+    MEDIUM: { win: 25, loss: 20 },
+    HARD: { win: 40, loss: 35 }
+  },
+  RATING_RANGES: {
+    BRONZE: { min: 0, max: 1199, title: "Bronze", color: "#cd7f32" },
+    SILVER: { min: 1200, max: 1399, title: "Silver", color: "#c0c0c0" },
+    GOLD: { min: 1400, max: 1599, title: "Gold", color: "#ffd700" },
+    PLATINUM: { min: 1600, max: 1799, title: "Platinum", color: "#e5e4e2" },
+    DIAMOND: { min: 1800, max: 1999, title: "Diamond", color: "#b9f2ff" },
+    MASTER: { min: 2000, max: 2199, title: "Master", color: "#ff6b6b" },
+    GRANDMASTER: { min: 2200, max: 2399, title: "Grandmaster", color: "#8b5cf6" },
+    LEGEND: { min: 2400, max: 9999, title: "Legend", color: "#fbbf24" }
   }
 };
 
-const encryptedStorage = {
-  getItem: (name) => {
-    const val = localStorage.getItem(name);
-    return val ? JSON.parse(deobfuscate(val)) : null;
+// Calculate ELO change based on result and difficulty
+const calculateEloChange = (currentElo, won, difficulty) => {
+  const kFactor = ELO_CONFIG.K_FACTOR[difficulty];
+  const change = won ? kFactor.win : -kFactor.loss;
+  
+  // Adjust based on current rating (higher rated players lose more, gain less)
+  const ratingMultiplier = currentElo > 1600 ? 0.8 : 1.0;
+  
+  return Math.round(change * ratingMultiplier);
+};
+
+// Get rank info from ELO rating
+const getRankFromElo = (elo) => {
+  for (const [rank, config] of Object.entries(ELO_CONFIG.RATING_RANGES)) {
+    if (elo >= config.min && elo <= config.max) {
+      return { rank, ...config };
+    }
+  }
+  return ELO_CONFIG.RATING_RANGES.BRONZE;
+};
+
+// Secure storage adapter for Zustand
+const secureStorageAdapter = {
+  getItem: async (name) => {
+    return await secureStorage.getItem(name);
   },
-  setItem: (name, value) => {
-    localStorage.setItem(name, obfuscate(JSON.stringify(value)));
+  setItem: async (name, value) => {
+    await secureStorage.setItem(name, value);
   },
-  removeItem: (name) => localStorage.removeItem(name),
+  removeItem: (name) => {
+    secureStorage.removeItem(name);
+  }
 };
 
 export const useGameStore = create(
@@ -149,92 +174,116 @@ export const useGameStore = create(
           currentStreak,
           bestStreak,
           matchHistory,
+          gamesPlayed,
+          gamesWon,
+          gamesLost,
         } = get();
 
         const playerWon = player1Score > player2Score;
         
-        // Difficulty Multipliers
-        const diffConfig = {
-          EASY: { win: { xp: 50, elo: 10 }, loss: { xp: -10, elo: -5 } },
-          MEDIUM: { win: { xp: 100, elo: 20 }, loss: { xp: -30, elo: -15 } },
-          HARD: { win: { xp: 200, elo: 40 }, loss: { xp: -60, elo: -30 } },
+        // Enhanced ELO calculation
+        const eloChange = calculateEloChange(playerELO, playerWon, difficulty);
+        const newELO = Math.max(0, playerELO + eloChange);
+        
+        // Enhanced XP calculation with level scaling
+        const baseXP = {
+          EASY: { win: 50, loss: -10 },
+          MEDIUM: { win: 100, loss: -30 },
+          HARD: { win: 200, loss: -60 }
         };
+        
+        const xpConfig = baseXP[difficulty] || baseXP.MEDIUM;
+        const levelMultiplier = 1 + (playerLevel - 1) * 0.1; // More XP needed at higher levels
+        const xpDelta = Math.round((playerWon ? xpConfig.win : xpConfig.loss) * levelMultiplier);
+        const newXP = Math.max(0, playerXP + xpDelta);
 
-        const config = diffConfig[difficulty] || diffConfig.MEDIUM;
-        const xpDelta = playerWon ? config.win.xp : config.loss.xp;
-        const eloDelta = playerWon ? config.win.elo : config.loss.elo;
-
-        // Calc new stats
-        let newXP = Math.max(0, playerXP + xpDelta);
-        let newELO = Math.max(0, playerELO + eloDelta);
+        // Level progression
         let newLevel = playerLevel;
-        const newStreak = playerWon ? currentStreak + 1 : 0;
-
-        // Check for Level Up
-        const getXPForLevel = (lvl) => 100 * Math.pow(1.5, lvl - 1);
+        const getXPForLevel = (lvl) => Math.round(100 * Math.pow(1.5, lvl - 1));
+        
         while (newXP >= getXPForLevel(newLevel)) {
           newXP -= getXPForLevel(newLevel);
           newLevel++;
-          // Optional: Add level up sound?
         }
 
-        const match = {
+        // Streak calculation
+        const newStreak = playerWon ? currentStreak + 1 : 0;
+        const newBestStreak = Math.max(bestStreak, newStreak);
+
+        // Match history entry
+        const matchEntry = {
           id: Date.now(),
           date: new Date().toISOString(),
-          mode: get().gameMode,
           difficulty,
-          player1Score,
-          player2Score,
-          result: playerWon ? "WIN" : "LOSS",
-          eloChange: eloDelta,
+          playerScore: player1Score,
+          aiScore: player2Score,
+          won: playerWon,
           xpChange: xpDelta,
-          eloAfter: newELO,
+          eloChange,
+          newELO,
+          newLevel,
+          streak: newStreak
         };
 
-        const newHistory = [match, ...matchHistory].slice(0, 10);
+        // Keep only last 20 matches
+        const updatedHistory = [matchEntry, ...matchHistory].slice(0, 20);
+
+        // Get rank info
+        const rankInfo = getRankFromElo(newELO);
 
         set({
-          gameState: "RESULT",
-          gamesPlayed: get().gamesPlayed + 1,
-          gamesWon: playerWon ? get().gamesWon + 1 : get().gamesWon,
-          gamesLost: !playerWon ? get().gamesLost + 1 : get().gamesLost,
-          playerELO: newELO,
+          gameState: "GAME_OVER",
           playerXP: newXP,
+          playerELO: newELO,
           playerLevel: newLevel,
-          eloChange: eloDelta,
-          xpChange: xpDelta,
           currentStreak: newStreak,
-          bestStreak: Math.max(bestStreak, newStreak),
-          matchHistory: newHistory,
+          bestStreak: newBestStreak,
+          xpChange: xpDelta,
+          eloChange,
+          gamesPlayed: gamesPlayed + 1,
+          gamesWon: playerWon ? gamesWon + 1 : gamesWon,
+          gamesLost: playerWon ? gamesLost : gamesLost + 1,
+          matchHistory: updatedHistory,
+          currentRank: rankInfo
         });
+
+        soundManager.playWin();
       },
 
-      resetGame: () => {
+      // Get current rank information
+      getCurrentRank: () => {
+        const { playerELO } = get();
+        return getRankFromElo(playerELO);
+      },
+
+      // Get XP needed for next level
+      getXPForNextLevel: () => {
+        const { playerLevel } = get();
+        return Math.round(100 * Math.pow(1.5, playerLevel - 1));
+      },
+
+      // Reset progress (for testing or new game+)
+      resetProgress: () => {
         set({
-          gameState: "HOME",
-          player1Score: 0,
-          player2Score: 0,
-          eloChange: 0,
+          playerLevel: 1,
+          playerXP: 0,
+          playerELO: ELO_CONFIG.BASE_RATING,
+          gamesPlayed: 0,
+          gamesWon: 0,
+          gamesLost: 0,
+          currentStreak: 0,
+          bestStreak: 0,
+          totalPucksScored: 0,
+          matchHistory: [],
           xpChange: 0,
-          aiThinking: false,
-          activePowerUps: {
-            slotFrozen: false,
-            megaPuckId: null,
-            ghostPuckId: null,
-            playerFrozen: false,
-          }
+          eloChange: 0
         });
       },
-
       updateTurnTime: () => {},
 
       getWinRate: () => {
         const { gamesPlayed, gamesWon } = get();
         return gamesPlayed > 0 ? Math.round((gamesWon / gamesPlayed) * 100) : 0;
-      },
-
-      getXPRequired: () => {
-        return Math.floor(100 * Math.pow(1.5, get().playerLevel - 1));
       },
 
       getPlayerTitle: () => {
@@ -266,8 +315,8 @@ export const useGameStore = create(
       }
     }),
     {
-      name: "game-storage-secure", // New name to avoid collision with old data
-      storage: encryptedStorage,
+      name: "sling-hockey-secure-v2", // Updated storage key
+      storage: createJSONStorage(() => secureStorageAdapter),
     }
   )
 );

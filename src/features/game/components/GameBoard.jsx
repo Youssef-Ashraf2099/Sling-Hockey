@@ -219,32 +219,12 @@ export default function GameBoard({ theme }) {
     [engine, screenToVirtual, dragState.isDragging]
   );
 
-  // Continuous AI Loop
+  // Continuous AI Loop - DISABLED (AI removed from balls, now just visual skins)
+  // AI functionality removed as requested - balls now use skins instead of AI
   useEffect(() => {
-    if (gameMode !== "PVE" && gameMode !== "PARTY") return;
-    if (gameState !== "PLAYING") return;
-
-    const interval = setInterval(() => {
-      // AI stops shooting if frozen powerup is active
-      if (activePowerUps.slotFrozen) return;
-
-      if (aiControllerRef.current && !aiControllerRef.current.isShooting) {
-        aiControllerRef.current.executeShot(pucks, engine, applyForce, dragState.activePuck?.id)
-          .then((shot) => {
-            if (shot) {
-              setDragState(prev => ({ 
-                ...prev, 
-                reboundTime: Date.now(), 
-                reboundSide: "ai" 
-              }));
-            }
-          })
-          .catch(console.error);
-      }
-    }, 1500); // AI tries to shoot every 1.5s if it can
-
-    return () => clearInterval(interval);
-  }, [gameMode, gameState, pucks, engine, applyForce, activePowerUps.slotFrozen]);
+    // AI system disabled - balls are now purely cosmetic with different skins
+    // Players control all balls manually using slingshot mechanics
+  }, []);
 
   // Pointer move - free drag and rope collision check with resistance
   const handlePointerMove = useCallback(
@@ -314,17 +294,26 @@ export default function GameBoard({ theme }) {
       const stretchDistance = py - PLAYER_ROPE_Y;
       
       if (stretchDistance > 5) {
-        // Calculate launch vector: from drag position towards the point on the rope
-        // where it was originally attached (x: px, y: PLAYER_ROPE_Y).
-        // Increased horizontal influence for more intuitive angled shots.
-        const dx = (px - puck.position.x) * 0.25; 
+        // FIXED PHYSICS: Calculate launch vector from drag position back to rope anchor
+        // This creates proper slingshot physics - ball launches opposite to pull direction
+        const ropeAnchorX = px; // Use the X position where rope was stretched
+        const ropeAnchorY = PLAYER_ROPE_Y;
         
-        // Force calculation
-        const forceMagnitude = stretchDistance * FORCE_MULTIPLIER * stretchDistance * 3.0;
+        // Vector from current drag position back to rope anchor (opposite direction)
+        const dx = ropeAnchorX - px; // Horizontal component (opposite to drag)
+        const dy = ropeAnchorY - py; // Vertical component (opposite to drag)
+        
+        // Normalize the direction vector
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const normalizedDx = dx / distance;
+        const normalizedDy = dy / distance;
+        
+        // Force magnitude based on stretch distance
+        const forceMagnitude = stretchDistance * FORCE_MULTIPLIER * stretchDistance * 4.0;
         
         const force = { 
-          x: -dx * FORCE_MULTIPLIER * stretchDistance * 80, 
-          y: -forceMagnitude 
+          x: normalizedDx * forceMagnitude * 1.2, // Horizontal force (opposite to drag)
+          y: normalizedDy * forceMagnitude        // Vertical force (opposite to drag)
         };
 
         try {
