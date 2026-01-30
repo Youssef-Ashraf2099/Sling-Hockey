@@ -140,7 +140,7 @@ export default function HomePage() {
         </div>
 
         {/* Features Highlight */}
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-5xl mx-auto mb-24">
           <div className="grid md:grid-cols-3 gap-8">
             <FeatureItem 
               icon={<Zap className="w-6 h-6 text-purple-400" />}
@@ -159,6 +159,35 @@ export default function HomePage() {
             />
           </div>
         </div>
+
+        {/* SEO Content Section */}
+        <section className="max-w-4xl mx-auto py-16 border-t border-white/5">
+          <h2 className="text-3xl font-black text-white italic tracking-tight mb-8 text-center uppercase">
+            Why Sling Hockey Pro?
+          </h2>
+          <div className="grid md:grid-cols-2 gap-12 text-gray-400">
+            <div>
+              <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+                <Target className="w-4 h-4 text-blue-400" /> Professional Tabletop Physics
+              </h3>
+              <p className="text-sm leading-relaxed font-medium">
+                Sling Hockey Pro brings the fastest tabletop sport to your browser with high-precision physics. 
+                Whether you call it <strong>Sling Hockey</strong>, <strong>Fastrack</strong>, or <strong>Pucket</strong>, 
+                our platform delivers the most authentic slingshot mechanics and puck dynamics found online.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+                <PartyPopper className="w-4 h-4 text-pink-400" /> Interactive Party Mode
+              </h3>
+              <p className="text-sm leading-relaxed font-medium">
+                Experience <strong>Party Mode</strong>, featuring dynamic power-ups like Mega Puck, Ghost Puck, and Freeze. 
+                This variant adds a tactical layer to the classic tabletop game, making every match unpredictable 
+                and high-stakes. Play for free on desktop or mobile.
+              </p>
+            </div>
+          </div>
+        </section>
       </main>
 
       <TutorialModal 
